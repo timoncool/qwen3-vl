@@ -277,19 +277,11 @@ class ImageDescriptionGenerator:
             else:
                 load_kwargs["torch_dtype"] = dtype
 
-            # Выбор attention implementation для ускорения
-            # Приоритет: flash_attention_2 > sdpa > eager
+            # SDPA (Scaled Dot Product Attention) - встроен в PyTorch 2.0+
+            # Быстрый и работает на Windows без доп. зависимостей
             if torch.cuda.is_available():
-                try:
-                    # Flash Attention 2 - самый быстрый (требует pip install flash-attn)
-                    import flash_attn
-                    load_kwargs["attn_implementation"] = "flash_attention_2"
-                    print("Using Flash Attention 2 (fastest)")
-                except ImportError:
-                    # SDPA - встроен в PyTorch 2.0+, ~97% скорости FA2
-                    load_kwargs["attn_implementation"] = "sdpa"
-                    print("Using SDPA attention (PyTorch native, fast)")
-                    print("Tip: Install flash-attn for ~3% faster inference")
+                load_kwargs["attn_implementation"] = "sdpa"
+                print("Using SDPA attention (PyTorch native, fast)")
 
             self.model = Qwen3VLForConditionalGeneration.from_pretrained(
                 model_name,
