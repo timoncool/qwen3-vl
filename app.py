@@ -438,7 +438,7 @@ def update_examples():
 
 def create_interface():
     """Create Gradio interface with current language"""
-    with gr.Blocks(title=get_text("title"), theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title=get_text("title")) as demo:
         # Header that will be updated
         header_md = gr.Markdown(f"""
         # {get_text("header")}
@@ -703,5 +703,6 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=7860,
         share=True,
-        show_error=True
+        show_error=True,
+        theme=gr.themes.Soft()
     )
