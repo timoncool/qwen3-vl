@@ -277,6 +277,12 @@ class ImageDescriptionGenerator:
             else:
                 load_kwargs["torch_dtype"] = dtype
 
+            # SDPA (Scaled Dot Product Attention) - встроен в PyTorch 2.0+
+            # Быстрый и работает на Windows без доп. зависимостей
+            if torch.cuda.is_available():
+                load_kwargs["attn_implementation"] = "sdpa"
+                print("Using SDPA attention (PyTorch native, fast)")
+
             self.model = Qwen3VLForConditionalGeneration.from_pretrained(
                 model_name,
                 **load_kwargs
@@ -340,15 +346,16 @@ class ImageDescriptionGenerator:
             )
             inputs = inputs.to(self.device)
             
-            # Генерируем ответ
-            with torch.no_grad():
+            # Генерируем ответ (inference_mode быстрее чем no_grad)
+            with torch.inference_mode():
                 generated_ids = self.model.generate(
                     **inputs,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
                     top_p=top_p,
                     top_k=top_k,
-                    do_sample=True if temperature > 0 else False
+                    do_sample=True if temperature > 0 else False,
+                    use_cache=True,  # KV кэширование для ускорения
                 )
             
             # Декодируем результат
