@@ -82,31 +82,31 @@ REM Проверяем наличие Python
 if exist "python\python.exe" (
     echo [2/6] Python уже установлен, пропускаем загрузку...
 ) else (
-    echo [2/6] Загрузка Python 3.13.9 Embeddable...
-    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.13.9/python-3.13.9-embed-amd64.zip' -OutFile 'downloads\python-3.13.9-embed-amd64.zip'}"
-    
-    if not exist "downloads\python-3.13.9-embed-amd64.zip" (
+    echo [2/6] Загрузка Python 3.12.8 Embeddable...
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.8/python-3.12.8-embed-amd64.zip' -OutFile 'downloads\python-3.12.8-embed-amd64.zip'}"
+
+    if not exist "downloads\python-3.12.8-embed-amd64.zip" (
         echo Ошибка загрузки Python!
         pause
         exit /b 1
     )
-    
+
     echo Распаковка Python...
-    powershell -Command "& {Expand-Archive -Path 'downloads\python-3.13.9-embed-amd64.zip' -DestinationPath 'python' -Force}"
+    powershell -Command "& {Expand-Archive -Path 'downloads\python-3.12.8-embed-amd64.zip' -DestinationPath 'python' -Force}"
 )
 
 REM Настраиваем Python для использования pip
 echo [3/6] Настройка Python...
 cd python
 
-REM Удаляем ограничение импорта из python313._pth
-if exist "python313._pth" (
-    echo import site> python313._pth.new
-    echo.>> python313._pth.new
-    echo python313.zip>> python313._pth.new
-    echo .>> python313._pth.new
-    echo ..\Lib\site-packages>> python313._pth.new
-    move /y python313._pth.new python313._pth >nul
+REM Удаляем ограничение импорта из python312._pth
+if exist "python312._pth" (
+    echo import site> python312._pth.new
+    echo.>> python312._pth.new
+    echo python312.zip>> python312._pth.new
+    echo .>> python312._pth.new
+    echo ..\Lib\site-packages>> python312._pth.new
+    move /y python312._pth.new python312._pth >nul
 )
 
 cd ..
