@@ -1,6 +1,6 @@
 import gradio as gr
 import torch
-from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
+from transformers import Qwen3VLForConditionalGeneration, AutoProcessor, BitsAndBytesConfig
 from qwen_vl_utils import process_vision_info
 from PIL import Image
 import random
@@ -10,6 +10,7 @@ from typing import List, Tuple, Optional
 import requests
 from io import BytesIO
 import urllib.parse
+import gc
 
 # Suppress specific warnings
 warnings.filterwarnings('ignore', message='.*meta device.*')
@@ -77,7 +78,12 @@ TRANSLATIONS = {
         "image_label": "=== Image {}: {} ===",
         "prompt_label": "Prompt: {}",
         "result_label": "Result: {}",
-        "model_size_warning": "⚠️ Note: Large models (8B+) may use CPU offloading if GPU memory is insufficient, which can slow down generation."
+        "model_size_warning": "⚠️ Note: Large models (8B+) may use CPU offloading if GPU memory is insufficient, which can slow down generation.",
+        "quantization": "Quantization",
+        "quantization_info": "Memory optimization (4-bit = ~75% less VRAM)",
+        "quant_4bit": "4-bit (Recommended)",
+        "quant_8bit": "8-bit (Better quality)",
+        "quant_none": "None (Full precision)"
     },
     "ru": {
         "title": "Генератор описаний изображений Qwen VL",
@@ -131,7 +137,12 @@ TRANSLATIONS = {
         "image_label": "=== Изображение {}: {} ===",
         "prompt_label": "Промт: {}",
         "result_label": "Результат: {}",
-        "model_size_warning": "⚠️ Примечание: Большие модели (8B+) могут использовать выгрузку на CPU при недостатке памяти GPU, что может замедлить генерацию."
+        "model_size_warning": "⚠️ Примечание: Большие модели (8B+) могут использовать выгрузку на CPU при недостатке памяти GPU, что может замедлить генерацию.",
+        "quantization": "Квантизация",
+        "quantization_info": "Оптимизация памяти (4-bit = ~75% меньше VRAM)",
+        "quant_4bit": "4-bit (Рекомендуется)",
+        "quant_8bit": "8-bit (Лучше качество)",
+        "quant_none": "Нет (Полная точность)"
     },
     "zh": {
         "title": "Qwen VL 图像描述生成器",
@@ -185,7 +196,12 @@ TRANSLATIONS = {
         "image_label": "=== 图像 {}: {} ===",
         "prompt_label": "提示词：{}",
         "result_label": "结果：{}",
-        "model_size_warning": "⚠️ 注意：如果 GPU 内存不足，大型模型（8B+）可能会使用 CPU 卸载，这可能会减慢生成速度。"
+        "model_size_warning": "⚠️ 注意：如果 GPU 内存不足，大型模型（8B+）可能会使用 CPU 卸载，这可能会减慢生成速度。",
+        "quantization": "量化",
+        "quantization_info": "内存优化（4位 = 减少约75%显存）",
+        "quant_4bit": "4位（推荐）",
+        "quant_8bit": "8位（更高质量）",
+        "quant_none": "无（全精度）"
     }
 }
 
@@ -201,36 +217,74 @@ class ImageDescriptionGenerator:
         self.model = None
         self.processor = None
         self.current_model_name = None
+        self.current_quantization = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        
-    def load_model(self, model_name: str):
-        """Загрузка модели только если она еще не загружена или изменилась"""
-        if self.current_model_name == model_name and self.model is not None:
+
+    def load_model(self, model_name: str, quantization: str = "4-bit"):
+        """Загрузка модели с квантизацией BitsAndBytes"""
+        # Проверяем нужна ли перезагрузка
+        if (self.current_model_name == model_name and
+            self.current_quantization == quantization and
+            self.model is not None):
             return
-        
+
         print(get_text("loading_model").format(model_name))
-        
+        print(f"Quantization: {quantization}")
+
         # Предупреждение о больших моделях
-        if "8B" in model_name or "4B" in model_name:
+        if "8B" in model_name or "32B" in model_name or "30B" in model_name:
             print(get_text("model_size_warning"))
-        
+
         # Освобождаем память от предыдущей модели
         if self.model is not None:
             del self.model
             del self.processor
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
-        
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
+        # Настройка квантизации BitsAndBytes
+        bnb_config = None
+        dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+
+        if quantization == "4-bit" and torch.cuda.is_available():
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
+            print("Using 4-bit quantization (NF4 + double quant) - ~75% VRAM reduction")
+        elif quantization == "8-bit" and torch.cuda.is_available():
+            bnb_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+            )
+            print("Using 8-bit quantization - ~50% VRAM reduction")
+        else:
+            print("Using full precision (bfloat16/float32)")
+
         # Загружаем новую модель с подавлением предупреждений
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore')
+            load_kwargs = {
+                "device_map": "auto",
+                "trust_remote_code": True,
+            }
+
+            if bnb_config is not None:
+                load_kwargs["quantization_config"] = bnb_config
+            else:
+                load_kwargs["torch_dtype"] = dtype
+
             self.model = Qwen3VLForConditionalGeneration.from_pretrained(
                 model_name,
-                dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-                device_map="auto"
+                **load_kwargs
             )
-            self.processor = AutoProcessor.from_pretrained(model_name)
-        
+            self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+
         self.current_model_name = model_name
+        self.current_quantization = quantization
         print(get_text("model_loaded").format(model_name, self.device))
     
     def generate_description(
@@ -238,6 +292,7 @@ class ImageDescriptionGenerator:
         image_path: str,
         prompt: str,
         model_name: str,
+        quantization: str = "4-bit",
         max_new_tokens: int = 1024,
         temperature: float = 0.6,
         top_p: float = 0.9,
@@ -247,7 +302,7 @@ class ImageDescriptionGenerator:
         """Генерация описания для одного изображения"""
         try:
             # Загружаем модель если необходимо
-            self.load_model(model_name)
+            self.load_model(model_name, quantization)
             
             # Устанавливаем seed если указан
             if seed != -1:
@@ -336,6 +391,7 @@ def process_single_image(
     image_url: str,
     prompt: str,
     model_name: str,
+    quantization: str,
     max_new_tokens: int,
     temperature: float,
     top_p: float,
@@ -346,12 +402,12 @@ def process_single_image(
     # Check if we have either uploaded image or URL
     if image is None and not image_url.strip():
         return get_text("error_no_image")
-    
+
     if not prompt.strip():
         return get_text("error_no_prompt")
-    
+
     temp_path = None
-    
+
     try:
         # Priority: URL over uploaded image (if both provided, URL takes precedence)
         if image_url.strip():
@@ -364,20 +420,21 @@ def process_single_image(
             image_path = temp_path
         else:
             image_path = image
-        
+
         result = generator.generate_description(
             image_path=image_path,
             prompt=prompt,
             model_name=model_name,
+            quantization=quantization,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
             seed=seed
         )
-        
+
         return result
-        
+
     except Exception as e:
         return str(e)
     finally:
@@ -392,6 +449,7 @@ def process_batch_images(
     files: List,
     prompts_text: str,
     model_name: str,
+    quantization: str,
     max_new_tokens: int,
     temperature: float,
     top_p: float,
@@ -401,19 +459,19 @@ def process_batch_images(
     """Обработка пакета изображений"""
     if not files:
         return get_text("error_no_images")
-    
+
     if not prompts_text.strip():
         return get_text("error_no_prompts")
-    
+
     # Разбиваем промты по строкам
     prompts = [p.strip() for p in prompts_text.split('\n') if p.strip()]
-    
+
     if len(prompts) == 1:
         # Если один промт, используем его для всех изображений
         prompts = prompts * len(files)
     elif len(prompts) != len(files):
         return get_text("error_prompt_mismatch").format(len(prompts), len(files))
-    
+
     results = []
     for idx, (file, prompt) in enumerate(zip(files, prompts), 1):
         image_path = file.name if hasattr(file, 'name') else file
@@ -421,6 +479,7 @@ def process_batch_images(
             image_path=image_path,
             prompt=prompt,
             model_name=model_name,
+            quantization=quantization,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_p=top_p,
@@ -430,7 +489,7 @@ def process_batch_images(
         results.append(get_text("image_label").format(idx, os.path.basename(image_path)) + "\n")
         results.append(get_text("prompt_label").format(prompt) + "\n")
         results.append(get_text("result_label").format(result) + "\n\n")
-    
+
     return "".join(results)
 
 def random_seed() -> int:
@@ -455,23 +514,41 @@ def create_interface():
         {get_text("subtitle")}
         """)
         
-        # Общие настройки - модель и язык в одном ряду
+        # Общие настройки - модель, квантизация и язык
         with gr.Row():
             model_dropdown = gr.Dropdown(
                 choices=[
-                    "Qwen/Qwen3-VL-2B-Instruct",
-                    "Qwen/Qwen3-VL-4B-Instruct",
-                    "Qwen/Qwen3-VL-8B-Instruct",
-                    "Qwen/Qwen3-VL-32B-Instruct",
-                    "Qwen/Qwen3-VL-2B-Thinking",
-                    "Qwen/Qwen3-VL-4B-Thinking",
-                    "Qwen/Qwen3-VL-8B-Thinking",
-                    "Qwen/Qwen3-VL-32B-Thinking",
+                    # Abliterated models (без цензуры) - рекомендуемые
+                    ("2B Instruct Abliterated (~1.2GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-2B-Instruct-abliterated"),
+                    ("2B Thinking Abliterated (~1.2GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-2B-Thinking-abliterated"),
+                    ("4B Instruct Abliterated (~2.5GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-4B-Instruct-abliterated"),
+                    ("4B Thinking Abliterated (~2.5GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-4B-Thinking-abliterated"),
+                    ("8B Instruct Abliterated (~5GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-8B-Instruct-abliterated"),
+                    ("8B Thinking Abliterated (~5GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-8B-Thinking-abliterated"),
+                    ("30B-A3B MoE Instruct Abliterated (~18GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-30B-A3B-Instruct-abliterated"),
+                    ("30B-A3B MoE Thinking Abliterated (~18GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-30B-A3B-Thinking-abliterated"),
+                    ("32B Instruct Abliterated (~18GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-32B-Instruct-abliterated"),
+                    ("32B Thinking Abliterated (~18GB 4-bit)", "huihui-ai/Huihui-Qwen3-VL-32B-Thinking-abliterated"),
+                    # Original Qwen models
+                    ("Qwen 2B Instruct (~1.2GB 4-bit)", "Qwen/Qwen3-VL-2B-Instruct"),
+                    ("Qwen 4B Instruct (~2.5GB 4-bit)", "Qwen/Qwen3-VL-4B-Instruct"),
+                    ("Qwen 8B Instruct (~5GB 4-bit)", "Qwen/Qwen3-VL-8B-Instruct"),
                 ],
-                value="Qwen/Qwen3-VL-2B-Instruct",
+                value="huihui-ai/Huihui-Qwen3-VL-2B-Instruct-abliterated",
                 label=get_text("model_selection"),
                 info=get_text("model_info"),
                 scale=3
+            )
+            quantization_dropdown = gr.Dropdown(
+                choices=[
+                    ("4-bit (Recommended)", "4-bit"),
+                    ("8-bit (Better quality)", "8-bit"),
+                    ("None (Full precision)", "none"),
+                ],
+                value="4-bit",
+                label=get_text("quantization"),
+                info=get_text("quantization_info"),
+                scale=1
             )
             language_dropdown = gr.Dropdown(
                 choices=[("English", "en"), ("Русский", "ru"), ("中文", "zh")],
@@ -598,15 +675,16 @@ def create_interface():
         def change_language(lang):
             global current_language
             current_language = lang
-            
+
             # Return updated text for all components
             return [
                 f"""
         # {get_text("header")}
-        
+
         {get_text("subtitle")}
         """,  # header_md
                 gr.update(label=get_text("model_selection"), info=get_text("model_info")),  # model_dropdown
+                gr.update(label=get_text("quantization"), info=get_text("quantization_info")),  # quantization_dropdown
                 gr.update(label=get_text("language"), info=get_text("language_info")),  # language_dropdown
                 gr.update(label=get_text("advanced_params")),  # advanced_accordion
                 gr.update(label=get_text("max_tokens"), info=get_text("max_tokens_info")),  # max_tokens_slider
@@ -629,13 +707,14 @@ def create_interface():
                 gr.update(value=get_text("process_batch_btn")),  # batch_submit_btn
                 gr.update(label=get_text("results")),  # batch_output
             ]
-        
+
         language_dropdown.change(
             fn=change_language,
             inputs=language_dropdown,
             outputs=[
                 header_md,
                 model_dropdown,
+                quantization_dropdown,
                 language_dropdown,
                 advanced_accordion,
                 max_tokens_slider,
@@ -678,6 +757,7 @@ def create_interface():
                 single_image_url,
                 single_prompt,
                 model_dropdown,
+                quantization_dropdown,
                 max_tokens_slider,
                 temperature_slider,
                 top_p_slider,
@@ -686,13 +766,14 @@ def create_interface():
             ],
             outputs=single_output
         )
-        
+
         batch_submit_btn.click(
             fn=process_batch_images,
             inputs=[
                 batch_images,
                 batch_prompts,
                 model_dropdown,
+                quantization_dropdown,
                 max_tokens_slider,
                 temperature_slider,
                 top_p_slider,
