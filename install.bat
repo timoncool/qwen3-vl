@@ -11,9 +11,17 @@ REM Определяем директорию скрипта
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
+REM Локальные temp директории
+set "TEMP=%SCRIPT_DIR%temp"
+set "TMP=%SCRIPT_DIR%temp"
+
 REM Создаем необходимые директории
 if not exist "python" mkdir python
 if not exist "downloads" mkdir downloads
+if not exist "temp" mkdir temp
+if not exist "models" mkdir models
+if not exist "cache" mkdir cache
+if not exist "output" mkdir output
 
 echo [1/6] Выбор версии CUDA для вашей видеокарты...
 echo.
@@ -130,14 +138,23 @@ python\python.exe -m pip install torch==%TORCH_VERSION% torchvision==%TORCHVISIO
 echo [5/6] Установка остальных зависимостей...
 python\python.exe -m pip install -r requirements.txt --no-warn-script-location
 
-echo [6/6] Создание ярлыка запуска...
+echo [6/6] Финализация установки...
 REM Создаем конфигурационный файл с версией CUDA
 echo %CUDA_VERSION%> cuda_version.txt
+
+REM Очищаем временные файлы установки
+rmdir /s /q "%TEMP%" 2>nul
 
 echo.
 echo ========================================
 echo Установка завершена успешно!
 echo ========================================
+echo.
+echo Структура папок:
+echo   models\ - кэш моделей HuggingFace
+echo   output\ - выходные файлы
+echo   temp\   - временные файлы
+echo   cache\  - кэш приложения
 echo.
 echo Для запуска приложения используйте run.bat
 echo.

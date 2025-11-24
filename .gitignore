@@ -1,0 +1,20 @@
+# Portable app directories
+python/
+downloads/
+models/
+cache/
+temp/
+output/
+
+# Config files
+cuda_version.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
