@@ -15,6 +15,9 @@ from datetime import datetime
 import time
 import tempfile
 from threading import Thread
+import io
+import sys
+import logging
 
 # Optional: psutil for memory monitoring
 try:
@@ -29,6 +32,46 @@ warnings.filterwarnings('ignore', message='.*meta device.*')
 
 # Global flag for stopping generation
 stop_generation_flag = False
+
+# Log capture class for console output
+class LogCapture:
+    """Captures stdout and logs for real-time console output in UI"""
+    def __init__(self):
+        self.log_buffer = io.StringIO()
+        self.original_stdout = sys.stdout
+        self.is_capturing = False
+
+    def start_capture(self):
+        """Start capturing stdout"""
+        if not self.is_capturing:
+            sys.stdout = self
+            self.is_capturing = True
+
+    def stop_capture(self):
+        """Stop capturing stdout"""
+        if self.is_capturing:
+            sys.stdout = self.original_stdout
+            self.is_capturing = False
+
+    def write(self, message):
+        """Write to both original stdout and buffer"""
+        self.original_stdout.write(message)
+        self.log_buffer.write(message)
+
+    def flush(self):
+        """Flush stdout"""
+        self.original_stdout.flush()
+
+    def get_logs(self):
+        """Get captured logs"""
+        return self.log_buffer.getvalue()
+
+    def clear_logs(self):
+        """Clear log buffer"""
+        self.log_buffer = io.StringIO()
+
+# Global log capture instance
+log_capture = LogCapture()
 
 # Base directory for portable app
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -122,11 +165,11 @@ def get_model_choices():
     for name, model_id in AVAILABLE_MODELS:
         cached_size = get_model_cache_size(model_id)
         if cached_size:
-            # Model is downloaded - show size and ЗАГРУЖЕНО
-            display_name = f"✅ {name} — {cached_size} ЗАГРУЖЕНО"
+            # Model is downloaded - show size
+            display_name = f"✅ {name} [{cached_size}]"
         else:
-            # Model not downloaded
-            display_name = f"⬜ {name}"
+            # Model not downloaded - will be downloaded on first use
+            display_name = f"⬇️ {name} [не скачана]"
         choices.append((display_name, model_id))
     return choices
 
@@ -1241,9 +1284,14 @@ def process_single_image(
     reset_stop_flag()
     start_time = time.time()
 
+    # Start capturing console output
+    log_capture.clear_logs()
+    log_capture.start_capture()
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Начало генерации...")
+
     # Check if we have either uploaded image or video
     if image is None and video is None:
-        yield get_text("error_no_image"), "", [], None
+        yield get_text("error_no_image"), "", [], None, log_capture.get_logs()
         return
 
     # Determine if processing video
@@ -1257,7 +1305,7 @@ def process_single_image(
         is_video=is_video
     )
     if not final_prompt.strip():
-        yield get_text("error_no_prompt"), "", [], None
+        yield get_text("error_no_prompt"), "", [], None, log_capture.get_logs()
         return
 
     temp_path = None
@@ -1286,13 +1334,15 @@ def process_single_image(
             # Check stop flag
             if stop_generation_flag:
                 elapsed_time = time.time() - start_time
-                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация остановлена пользователем")
+                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs()
                 return
 
             variant_start = time.time()
             variant_seed = seed if seed == -1 else seed + i
             memory_info = get_memory_info()
             status_msg = f"{get_text('generating')} ({get_text('variant')} {i+1}/{num_variants}) | {memory_info}"
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация варианта {i+1}/{num_variants}, seed={variant_seed}")
 
             if use_streaming:
                 # Stream the generation for real-time output
@@ -1314,12 +1364,12 @@ def process_single_image(
                     current_result = partial_result
                     # Update results with streaming text
                     temp_results = results + [current_result]
-                    yield status_msg, final_prompt, temp_results, None
+                    yield status_msg, final_prompt, temp_results, None, log_capture.get_logs()
 
                 result = current_result
             else:
                 # Non-streaming generation
-                yield status_msg, final_prompt, results, None
+                yield status_msg, final_prompt, results, None, log_capture.get_logs()
                 result = generator.generate_description(
                     image_path=media_path,
                     prompt=final_prompt,
@@ -1336,6 +1386,7 @@ def process_single_image(
             variant_time = time.time() - variant_start
             variant_times.append(variant_time)
             results.append(result)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Вариант {i+1} завершен за {variant_time:.1f}s")
 
         # Calculate processing time
         elapsed_time = time.time() - start_time
@@ -1351,11 +1402,16 @@ def process_single_image(
             all_text = "\n\n".join([f"=== Variant {i+1} (Time: {variant_times[i]:.1f}s) ===\n{r}" for i, r in enumerate(results)])
             download_path = save_text_to_file(all_text, f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
 
-        yield final_status, final_prompt, results, download_path
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация завершена успешно за {elapsed_time:.1f}s")
+        yield final_status, final_prompt, results, download_path, log_capture.get_logs()
 
     except Exception as e:
-        yield f"❌ Error: {str(e)}", final_prompt, [], None
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Ошибка: {str(e)}")
+        yield f"❌ Error: {str(e)}", final_prompt, [], None, log_capture.get_logs()
     finally:
+        # Stop capturing console output
+        log_capture.stop_capture()
+
         # Удаляем временный файл
         if temp_path and os.path.exists(temp_path):
             try:
@@ -1538,19 +1594,19 @@ def update_examples():
 def create_interface():
     """Create Gradio interface with current language and beautiful styling"""
     with gr.Blocks(
-        title=get_text("title"),
+        title="SuperCaption Qwen3-VL PRO",
         theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="purple", neutral_hue="slate"),
         css=CUSTOM_CSS
     ) as demo:
         # Beautiful gradient header with credits
         gr.HTML("""
         <div class="main-header">
-            <h1>🖼️ Qwen VL Image Description Generator PRO</h1>
-            <p>Advanced AI-powered image description with multiple styles and export options</p>
+            <h1>🎬 SuperCaption Qwen3-VL PRO</h1>
+            <p>Генератор описаний и тегов для фото и видео</p>
             <p style="font-size: 0.9rem; margin-top: 0.75rem; opacity: 0.85;">
-                Developed by <a href="#">NeuralSoft</a> |
-                Powered by <a href="https://huggingface.co/Qwen" target="_blank">Qwen Vision Models</a> |
-                <a href="https://github.com/timoncool/qwen3-vl" target="_blank">GitHub</a>
+                Портативная версия от <a href="https://t.me/nerual_dreming" target="_blank">Nerual Dreming</a> и
+                <a href="https://t.me/ruweb24" target="_blank">Slait</a> |
+                <a href="https://t.me/neuroport" target="_blank">👾 НЕЙРО-СОФТ</a>
             </p>
         </div>
         """)
@@ -1568,6 +1624,12 @@ def create_interface():
                 label=get_text("model_selection"),
                 info=get_text("model_info"),
                 scale=3
+            )
+            refresh_models_btn = gr.Button(
+                "🔄",
+                size="sm",
+                scale=0,
+                min_width=40
             )
             quantization_dropdown = gr.Dropdown(
                 choices=[
@@ -1813,6 +1875,17 @@ def create_interface():
                             label=get_text("download_result"),
                             visible=True
                         )
+
+                        # Console output accordion
+                        with gr.Accordion("📟 Консоль", open=False):
+                            single_console_output = gr.Textbox(
+                                label="",
+                                lines=10,
+                                max_lines=20,
+                                interactive=False,
+                                show_copy_button=True,
+                                placeholder="Здесь будут отображаться системные сообщения и логи во время генерации..."
+                            )
 
                 # Кликабельные примеры промтов
                 examples_title = gr.Markdown(f"### {get_text('examples_title')}")
@@ -2149,6 +2222,16 @@ def create_interface():
         batch_video_stop_btn.click(
             fn=stop_generation,
             outputs=batch_video_status
+        )
+
+        # Model list refresh handler
+        def refresh_model_list():
+            """Обновить список моделей с актуальным статусом загрузки"""
+            return gr.update(choices=get_model_choices())
+
+        refresh_models_btn.click(
+            fn=refresh_model_list,
+            outputs=model_dropdown
         )
 
         # Preset refresh handlers
