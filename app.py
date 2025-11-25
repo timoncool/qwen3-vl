@@ -134,6 +134,28 @@ def load_prompt_presets() -> dict:
 
     return presets
 
+def save_prompt_preset(name: str, prompt: str) -> str:
+    """Save a prompt preset to the prompts directory"""
+    if not name or not name.strip():
+        return "❌ Please provide a preset name"
+
+    if not prompt or not prompt.strip():
+        return "❌ Please provide a prompt to save"
+
+    # Sanitize filename
+    safe_name = "".join(c for c in name if c.isalnum() or c in "_ -").strip()
+    if not safe_name:
+        return "❌ Invalid preset name"
+
+    try:
+        os.makedirs(PROMPTS_DIR, exist_ok=True)
+        filepath = os.path.join(PROMPTS_DIR, f"{safe_name}.txt")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(prompt.strip())
+        return f"✅ Preset '{safe_name}' saved successfully!"
+    except Exception as e:
+        return f"❌ Error saving preset: {str(e)}"
+
 def save_text_to_file(text: str, filename: str = "result.txt") -> str:
     """Save text to a temporary file and return the path"""
     temp_file = os.path.join(TEMP_DIR, filename)
