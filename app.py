@@ -7,9 +7,6 @@ import random
 import os
 import warnings
 from typing import List, Tuple, Optional, Generator
-import requests
-from io import BytesIO
-import urllib.parse
 import gc
 import json
 import csv
@@ -941,6 +938,65 @@ class ImageDescriptionGenerator:
         self.current_quantization = quantization
         print(get_text("model_loaded").format(model_name, self.device))
     
+    def _prepare_inputs(
+        self,
+        media_path: str,
+        prompt: str,
+        model_name: str,
+        quantization: str,
+        seed: int,
+        is_video: bool = False
+    ):
+        """Prepare inputs for generation"""
+        # Загружаем модель если необходимо
+        self.load_model(model_name, quantization)
+
+        # Устанавливаем seed если указан
+        if seed != -1:
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(seed)
+
+        # Подготавливаем сообщения для модели
+        # Use "video" type for videos, "image" for images
+        if is_video:
+            content_item = {
+                "type": "video",
+                "video": media_path,
+            }
+        else:
+            content_item = {
+                "type": "image",
+                "image": media_path,
+            }
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    content_item,
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+
+        # Подготавливаем текст для модели
+        text = self.processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
+        # Обрабатываем изображение/видео и текст
+        image_inputs, video_inputs = process_vision_info(messages)
+        inputs = self.processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to(self.device)
+        return inputs
+
     def generate_description(
         self,
         image_path: str,
@@ -952,137 +1008,100 @@ class ImageDescriptionGenerator:
         top_p: float = 0.9,
         top_k: int = 50,
         seed: int = -1,
-        stream: bool = False
-    ) -> Generator[str, None, None] if False else str:
-        """Генерация описания для одного изображения с опциональным streaming"""
+        is_video: bool = False
+    ) -> str:
+        """Генерация описания для одного изображения/видео (без streaming)"""
         try:
-            # Загружаем модель если необходимо
-            self.load_model(model_name, quantization)
-
-            # Устанавливаем seed если указан
-            if seed != -1:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
-
-            # Подготавливаем сообщения для модели
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "image": image_path,
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ]
-
-            # Подготавливаем текст для модели
-            text = self.processor.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+            inputs = self._prepare_inputs(
+                image_path, prompt, model_name, quantization, seed, is_video
             )
 
-            # Обрабатываем изображение и текст
-            image_inputs, video_inputs = process_vision_info(messages)
-            inputs = self.processor(
-                text=[text],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-            )
-            inputs = inputs.to(self.device)
-
-            # Streaming generation
-            if stream:
-                streamer = TextIteratorStreamer(
-                    self.processor.tokenizer,
-                    skip_special_tokens=True,
-                    skip_prompt=True
-                )
-
-                generation_kwargs = {
+            # Non-streaming generation (inference_mode быстрее чем no_grad)
+            with torch.inference_mode():
+                generated_ids = self.model.generate(
                     **inputs,
-                    "max_new_tokens": max_new_tokens,
-                    "temperature": temperature,
-                    "top_p": top_p,
-                    "top_k": top_k,
-                    "do_sample": True if temperature > 0 else False,
-                    "use_cache": True,
-                    "streamer": streamer,
-                }
-
-                # Run generation in a separate thread
-                thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
-                thread.start()
-
-                # Yield tokens as they come
-                generated_text = ""
-                for new_text in streamer:
-                    generated_text += new_text
-                    yield generated_text
-
-                thread.join()
-                return generated_text
-            else:
-                # Non-streaming generation (inference_mode быстрее чем no_grad)
-                with torch.inference_mode():
-                    generated_ids = self.model.generate(
-                        **inputs,
-                        max_new_tokens=max_new_tokens,
-                        temperature=temperature,
-                        top_p=top_p,
-                        top_k=top_k,
-                        do_sample=True if temperature > 0 else False,
-                        use_cache=True,  # KV кэширование для ускорения
-                    )
-
-                # Декодируем результат
-                generated_ids_trimmed = [
-                    out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-                ]
-                output_text = self.processor.batch_decode(
-                    generated_ids_trimmed,
-                    skip_special_tokens=True,
-                    clean_up_tokenization_spaces=False
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    do_sample=True if temperature > 0 else False,
+                    use_cache=True,  # KV кэширование для ускорения
                 )
 
-                return output_text[0]
+            # Декодируем результат
+            generated_ids_trimmed = [
+                out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+            ]
+            output_text = self.processor.batch_decode(
+                generated_ids_trimmed,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False
+            )
+
+            return output_text[0]
 
         except Exception as e:
             error_msg = get_text("error_generation").format(str(e))
-            if stream:
-                yield error_msg
-                return error_msg
-            else:
-                return error_msg
+            return error_msg
+
+    def generate_description_stream(
+        self,
+        image_path: str,
+        prompt: str,
+        model_name: str,
+        quantization: str = "4-bit",
+        max_new_tokens: int = 1024,
+        temperature: float = 0.6,
+        top_p: float = 0.9,
+        top_k: int = 50,
+        seed: int = -1,
+        is_video: bool = False
+    ) -> Generator[str, None, None]:
+        """Генерация описания для одного изображения/видео со streaming"""
+        try:
+            inputs = self._prepare_inputs(
+                image_path, prompt, model_name, quantization, seed, is_video
+            )
+
+            streamer = TextIteratorStreamer(
+                self.processor.tokenizer,
+                skip_special_tokens=True,
+                skip_prompt=True
+            )
+
+            generation_kwargs = {
+                **inputs,
+                "max_new_tokens": max_new_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+                "do_sample": True if temperature > 0 else False,
+                "use_cache": True,
+                "streamer": streamer,
+            }
+
+            # Run generation in a separate thread
+            thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+            thread.start()
+
+            # Yield tokens as they come
+            generated_text = ""
+            for new_text in streamer:
+                generated_text += new_text
+                yield generated_text
+
+            thread.join()
+
+        except Exception as e:
+            error_msg = get_text("error_generation").format(str(e))
+            yield error_msg
 
 # Создаем глобальный экземпляр генератора
 generator = ImageDescriptionGenerator()
 
-def load_image_from_url(url: str) -> Optional[str]:
-    """Load image from URL and save to temporary file"""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        
-        # Load image from response content
-        image = Image.open(BytesIO(response.content))
-        
-        # Save to temporary file
-        temp_path = os.path.join(TEMP_DIR, "temp_url_image.jpg")
-        image.save(temp_path)
-        
-        return temp_path
-    except Exception as e:
-        raise Exception(get_text("error_url_load").format(str(e)))
-
 def process_single_image(
     image,
     video,
-    image_url: str,
     description_type: str,
     description_length: str,
     custom_prompt: str,
@@ -1104,8 +1123,8 @@ def process_single_image(
     reset_stop_flag()
     start_time = time.time()
 
-    # Check if we have either uploaded image/video or URL
-    if image is None and video is None and not image_url.strip():
+    # Check if we have either uploaded image or video
+    if image is None and video is None:
         yield get_text("error_no_image"), "", [], None
         return
 
@@ -1127,24 +1146,19 @@ def process_single_image(
     num_variants = int(num_variants) if num_variants and str(num_variants).strip() else 1
 
     try:
-        # Priority: URL > video > image
-        if image_url and image_url.strip():
-            yield f"⏳ {get_text('generating')} (loading from URL...)", final_prompt, [], None
-            image_path = load_image_from_url(image_url.strip())
-            temp_path = image_path
-            is_video = False  # URLs are images
-        elif video is not None:
+        # Priority: video > image
+        if video is not None:
             # Video uploaded - use it directly
-            image_path = video
+            media_path = video
             is_video = True
         elif hasattr(image, 'shape'):
             # Сохраняем временное изображение если это numpy array
             temp_path = os.path.join(TEMP_DIR, "temp_image.jpg")
             Image.fromarray(image).save(temp_path)
-            image_path = temp_path
+            media_path = temp_path
             is_video = False
         else:
-            image_path = image
+            media_path = image
             is_video = False
 
         results = []
@@ -1165,8 +1179,8 @@ def process_single_image(
             if use_streaming:
                 # Stream the generation for real-time output
                 current_result = ""
-                for partial_result in generator.generate_description(
-                    image_path=image_path,
+                for partial_result in generator.generate_description_stream(
+                    image_path=media_path,
                     prompt=final_prompt,
                     model_name=model_name,
                     quantization=quantization,
@@ -1175,7 +1189,7 @@ def process_single_image(
                     top_p=top_p,
                     top_k=top_k,
                     seed=variant_seed,
-                    stream=True
+                    is_video=is_video
                 ):
                     if stop_generation_flag:
                         break
@@ -1189,7 +1203,7 @@ def process_single_image(
                 # Non-streaming generation
                 yield status_msg, final_prompt, results, None
                 result = generator.generate_description(
-                    image_path=image_path,
+                    image_path=media_path,
                     prompt=final_prompt,
                     model_name=model_name,
                     quantization=quantization,
@@ -1198,7 +1212,7 @@ def process_single_image(
                     top_p=top_p,
                     top_k=top_k,
                     seed=variant_seed,
-                    stream=False
+                    is_video=is_video
                 )
 
             variant_time = time.time() - variant_start
@@ -1324,7 +1338,7 @@ def process_batch_images(
                 top_p=top_p,
                 top_k=top_k,
                 seed=variant_seed,
-                stream=False  # No streaming for batch to avoid complexity
+                is_video=is_video
             )
             variant_time = time.time() - variant_start
             variant_times.append(variant_time)
@@ -1540,17 +1554,6 @@ def create_interface():
                                     label=get_text("upload_image"),
                                     height=300
                                 )
-                                single_image_url = gr.Textbox(
-                                    label=get_text("image_url"),
-                                    placeholder=get_text("image_url_placeholder"),
-                                    lines=1
-                                )
-                                # Duplicate Generate button under image upload
-                                single_submit_btn_top = gr.Button(
-                                    get_text("generate_btn"),
-                                    variant="primary",
-                                    elem_classes="generate-btn"
-                                )
 
                             video_tab = gr.TabItem("🎥 Video")
                             with video_tab:
@@ -1558,44 +1561,8 @@ def create_interface():
                                     label="Upload Video",
                                     height=300
                                 )
-                                # Duplicate Generate button under video upload
-                                single_submit_btn_top_video = gr.Button(
-                                    get_text("generate_btn"),
-                                    variant="primary",
-                                    elem_classes="generate-btn"
-                                )
 
                         gr.Markdown("### 📝 Description Settings")
-
-                        # Prompt preset dropdown with save option
-                        with gr.Row():
-                            single_preset = gr.Dropdown(
-                                choices=list(load_prompt_presets().keys()),
-                                value="None",
-                                label=get_text("prompt_preset"),
-                                info=get_text("prompt_preset_info"),
-                                scale=3
-                            )
-                            single_refresh_presets = gr.Button(
-                                get_text("refresh_presets"),
-                                size="sm",
-                                scale=1
-                            )
-                        
-                        # Save preset accordion
-                        with gr.Accordion("💾 Save Preset", open=False):
-                            with gr.Row():
-                                single_save_preset_name = gr.Textbox(
-                                    label="Preset Name",
-                                    placeholder="my_preset",
-                                    scale=2
-                                )
-                                single_save_preset_btn = gr.Button(
-                                    "Save",
-                                    size="sm",
-                                    scale=1
-                                )
-                            single_save_preset_status = gr.Markdown("")
 
                         single_desc_type = gr.Dropdown(
                             choices=get_description_types(),
@@ -1644,6 +1611,36 @@ def create_interface():
                                 lines=3,
                                 label=""
                             )
+
+                        # Prompt presets section - collapsed accordion at the bottom
+                        with gr.Accordion("📋 Prompt Presets", open=False):
+                            with gr.Row():
+                                single_preset = gr.Dropdown(
+                                    choices=list(load_prompt_presets().keys()),
+                                    value="None",
+                                    label=get_text("prompt_preset"),
+                                    info=get_text("prompt_preset_info"),
+                                    scale=3
+                                )
+                                single_refresh_presets = gr.Button(
+                                    get_text("refresh_presets"),
+                                    size="sm",
+                                    scale=1
+                                )
+                            gr.Markdown("---")
+                            gr.Markdown("**Save Current Prompt as Preset:**")
+                            with gr.Row():
+                                single_save_preset_name = gr.Textbox(
+                                    label="Preset Name",
+                                    placeholder="my_preset",
+                                    scale=2
+                                )
+                                single_save_preset_btn = gr.Button(
+                                    "💾 Save",
+                                    size="sm",
+                                    scale=1
+                                )
+                            single_save_preset_status = gr.Markdown("")
 
                         with gr.Row():
                             single_submit_btn = gr.Button(
@@ -1962,8 +1959,6 @@ def create_interface():
                 gr.update(label=get_text("language"), info=get_text("language_info")),  # language_dropdown
                 gr.update(label=get_text("advanced_params")),  # advanced_accordion
                 gr.update(value=get_text("generate_btn")),  # single_submit_btn
-                gr.update(value=get_text("generate_btn")),  # single_submit_btn_top
-                gr.update(value=get_text("generate_btn")),  # single_submit_btn_top_video
                 gr.update(value=get_text("process_batch_btn")),  # batch_submit_btn
                 gr.update(choices=get_description_types(), value=get_description_types()[0]),  # single_desc_type
                 gr.update(choices=get_description_lengths(), value=get_description_lengths()[0]),  # single_desc_length
@@ -1987,8 +1982,6 @@ def create_interface():
                 language_dropdown,
                 advanced_accordion,
                 single_submit_btn,
-                single_submit_btn_top,
-                single_submit_btn_top_video,
                 batch_submit_btn,
                 single_desc_type,
                 single_desc_length,
@@ -2083,7 +2076,7 @@ def create_interface():
         )
 
         # Single image processing with button lock
-        def process_single_wrapper(image, video, image_url, desc_type, desc_length, custom_prompt,
+        def process_single_wrapper(image, video, desc_type, desc_length, custom_prompt,
                                    extra_options, character_name, num_variants,
                                    model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
             # Disable button at start
@@ -2094,7 +2087,7 @@ def create_interface():
 
             # Process and yield results
             for status, prompt_used, results, download_path in process_single_image(
-                image, video, image_url, desc_type, desc_length, custom_prompt,
+                image, video, desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed
             ):
@@ -2123,7 +2116,6 @@ def create_interface():
             inputs=[
                 single_image,
                 single_video,
-                single_image_url,
                 single_desc_type,
                 single_desc_length,
                 single_custom_prompt,
@@ -2141,82 +2133,14 @@ def create_interface():
             outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
         )
 
-        # Duplicate button handlers - connect to same wrapper function
-        single_submit_btn_top.click(
-            fn=process_single_wrapper,
-            inputs=[
-                single_image,
-                single_video,
-                single_image_url,
-                single_desc_type,
-                single_desc_length,
-                single_custom_prompt,
-                single_extra_options,
-                single_character_name,
-                single_num_variants,
-                model_dropdown,
-                quantization_dropdown,
-                max_tokens_slider,
-                temperature_slider,
-                top_p_slider,
-                top_k_slider,
-                seed_number
-            ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
-        )
-
-        single_submit_btn_top_video.click(
-            fn=process_single_wrapper,
-            inputs=[
-                single_image,
-                single_video,
-                single_image_url,
-                single_desc_type,
-                single_desc_length,
-                single_custom_prompt,
-                single_extra_options,
-                single_character_name,
-                single_num_variants,
-                model_dropdown,
-                quantization_dropdown,
-                max_tokens_slider,
-                temperature_slider,
-                top_p_slider,
-                top_k_slider,
-                seed_number
-            ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
-        )
-        
-        # Preset handlers
-        def refresh_presets_list():
-            presets = load_prompt_presets()
-            return gr.update(choices=list(presets.keys()), value="None")
-        
-        single_refresh_presets.click(
-            fn=refresh_presets_list,
-            outputs=single_preset
-        )
-        
-        def load_preset(preset_name):
-            if preset_name and preset_name != "None":
-                presets = load_prompt_presets()
-                return presets.get(preset_name, "")
-            return ""
-        
-        single_preset.change(
-            fn=load_preset,
-            inputs=single_preset,
-            outputs=single_custom_prompt
-        )
-        
+        # Save preset handler
         def save_preset(name, prompt):
             if not name:
                 return "❌ Please enter a preset name"
             msg = save_prompt_preset(name, prompt)
             new_presets = list(load_prompt_presets().keys())
             return msg, gr.update(choices=new_presets, value=name if "successfully" in msg else None)
-        
+
         single_save_preset_btn.click(
             fn=save_preset,
             inputs=[single_save_preset_name, single_custom_prompt],
