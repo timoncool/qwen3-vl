@@ -37,32 +37,36 @@ stop_generation_flag = False
 # Console Log Capture for UI display
 # ==========================================
 class LogCapture:
-    """Captures stdout and logs for real-time console output in UI"""
+    """Captures stdout and stderr for real-time console output in UI"""
     def __init__(self):
         self.log_buffer = io.StringIO()
         self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
         self.is_capturing = False
 
     def start_capture(self):
-        """Start capturing stdout"""
+        """Start capturing stdout and stderr"""
         if not self.is_capturing:
             sys.stdout = self
+            sys.stderr = self
             self.is_capturing = True
 
     def stop_capture(self):
-        """Stop capturing stdout"""
+        """Stop capturing stdout and stderr"""
         if self.is_capturing:
             sys.stdout = self.original_stdout
+            sys.stderr = self.original_stderr
             self.is_capturing = False
 
     def write(self, message):
-        """Write to both original stdout and buffer"""
+        """Write to both original stdout/stderr and buffer"""
         self.original_stdout.write(message)
         self.log_buffer.write(message)
 
     def flush(self):
-        """Flush stdout"""
+        """Flush stdout and stderr"""
         self.original_stdout.flush()
+        self.original_stderr.flush()
 
     def get_logs(self):
         """Get captured logs"""
@@ -894,6 +898,9 @@ def build_prompt(
 
         # Get length modifier
         lengths_dict = DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"])
+        # Fix if description_length is a list (shouldn't happen but Gradio bug)
+        if isinstance(description_length, list):
+            description_length = description_length[0] if description_length else ""
         length_modifier = lengths_dict.get(description_length, "")
 
         # Combine type and length
@@ -1808,17 +1815,21 @@ def create_interface():
                                 )
                                 # Video segment controls
                                 with gr.Row():
-                                    video_start_time = gr.Number(
+                                    video_start_time = gr.Slider(
                                         label="⏱️ Начало (секунды)",
-                                        value=None,
+                                        value=0,
                                         minimum=0,
-                                        info="Оставьте пустым для обработки с начала видео"
+                                        maximum=7200,
+                                        step=0.1,
+                                        info="Начало сегмента видео (0 = с начала)"
                                     )
-                                    video_end_time = gr.Number(
+                                    video_end_time = gr.Slider(
                                         label="⏱️ Конец (секунды)",
-                                        value=None,
+                                        value=0,
                                         minimum=0,
-                                        info="Оставьте пустым для обработки до конца видео"
+                                        maximum=7200,
+                                        step=0.1,
+                                        info="Конец сегмента видео (0 = до конца)"
                                     )
                                 # Duplicate Generate/Stop buttons for quick access
                                 with gr.Row():
@@ -2442,6 +2453,8 @@ def create_interface():
             inputs=[
                 single_image,
                 single_video,
+                video_start_time,
+                video_end_time,
                 single_desc_type,
                 single_desc_length,
                 single_custom_prompt,
