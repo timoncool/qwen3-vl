@@ -16,20 +16,141 @@ import csv
 import shutil
 from datetime import datetime
 import time
+import tempfile
+
+# Optional: psutil for memory monitoring
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Note: psutil not installed. RAM monitoring will be limited.")
 
 # Suppress specific warnings
 warnings.filterwarnings('ignore', message='.*meta device.*')
+
+# Global flag for stopping generation
+stop_generation_flag = False
 
 # Base directory for portable app
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.path.join(SCRIPT_DIR, "temp")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
 DATASETS_DIR = os.path.join(SCRIPT_DIR, "datasets")
+PROMPTS_DIR = os.path.join(SCRIPT_DIR, "prompts")
 
 # Create directories if they don't exist
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATASETS_DIR, exist_ok=True)
+os.makedirs(PROMPTS_DIR, exist_ok=True)
+
+# Extra options for description enhancement
+EXTRA_OPTIONS = {
+    "en": {
+        "Include lighting info": "Include information about lighting.",
+        "Include camera angle": "Include information about camera angle.",
+        "Include watermark info": "Include information about whether there is a watermark or not.",
+        "Include JPEG artifacts info": "Include information about whether there are JPEG artifacts or not.",
+        "Include camera/photo details": "If it is a photo, include information about what camera was likely used and details such as aperture, shutter speed, ISO, etc.",
+        "Keep it SFW/PG": "Do NOT include anything sexual; keep it PG.",
+        "Don't mention resolution": "Do NOT mention the image's resolution.",
+        "Include aesthetic quality": "Include information about the subjective aesthetic quality of the image from low to very high.",
+        "Include composition style": "Include information on the image's composition style, such as leading lines, rule of thirds, or symmetry.",
+        "Don't mention text in image": "Do NOT mention any text that is in the image.",
+        "Include depth of field": "Specify the depth of field and whether the background is in focus or blurred.",
+        "Describe only key elements": "ONLY describe the most important elements of the image."
+    },
+    "ru": {
+        "Добавить информацию об освещении": "Добавь информацию об освещении.",
+        "Добавить ракурс камеры": "Добавь информацию о ракурсе камеры.",
+        "Упомянуть водяной знак": "Укажи, есть ли водяной знак на изображении.",
+        "Упомянуть JPEG артефакты": "Укажи, есть ли JPEG артефакты на изображении.",
+        "Добавить детали камеры/фото": "Если это фотография, укажи информацию о камере, апертуре, выдержке, ISO и т.д.",
+        "Сохранить SFW/PG рейтинг": "НЕ включай сексуальный контент, сохраняй рейтинг PG.",
+        "Не упоминать разрешение": "НЕ упоминай разрешение изображения.",
+        "Добавить эстетическую оценку": "Добавь информацию о субъективном эстетическом качестве от низкого до очень высокого.",
+        "Добавить стиль композиции": "Добавь информацию о стиле композиции (ведущие линии, правило третей, симметрия).",
+        "Не упоминать текст на изображении": "НЕ упоминай текст, который есть на изображении.",
+        "Добавить глубину резкости": "Укажи глубину резкости и размытость фона.",
+        "Описывать только ключевые элементы": "Описывай ТОЛЬКО самые важные элементы изображения."
+    },
+    "zh": {
+        "包含光照信息": "包含光照信息。",
+        "包含相机角度": "包含相机角度信息。",
+        "提及水印": "说明图片是否有水印。",
+        "提及JPEG伪影": "说明图片是否有JPEG伪影。",
+        "包含相机/照片详情": "如果是照片，包含可能使用的相机信息，如光圈、快门速度、ISO等。",
+        "保持SFW/PG级别": "不要包含任何性相关内容，保持PG级别。",
+        "不要提及分辨率": "不要提及图片的分辨率。",
+        "包含美学质量评价": "包含从低到非常高的主观美学质量评价。",
+        "包含构图风格": "包含构图风格信息，如引导线、三分法则或对称性。",
+        "不要提及图片中的文字": "不要提及图片中的任何文字。",
+        "包含景深信息": "说明景深以及背景是否模糊。",
+        "只描述关键元素": "只描述图片中最重要的元素。"
+    }
+}
+
+def get_memory_info() -> str:
+    """Get current memory usage information"""
+    info_parts = []
+
+    # GPU memory
+    if torch.cuda.is_available():
+        try:
+            allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+            reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+            total = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+            info_parts.append(f"GPU: {allocated:.1f}/{total:.1f} GB (reserved: {reserved:.1f} GB)")
+        except:
+            pass
+
+    # RAM
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process(os.getpid())
+            ram_usage = process.memory_info().rss / (1024 ** 3)
+            info_parts.append(f"RAM: {ram_usage:.1f} GB")
+        except:
+            pass
+
+    return " | ".join(info_parts) if info_parts else "Memory info unavailable"
+
+def load_prompt_presets() -> dict:
+    """Load prompt presets from the prompts directory"""
+    presets = {"None": ""}
+
+    if not os.path.exists(PROMPTS_DIR):
+        return presets
+
+    for filename in os.listdir(PROMPTS_DIR):
+        if filename.endswith('.txt'):
+            preset_name = os.path.splitext(filename)[0]
+            try:
+                with open(os.path.join(PROMPTS_DIR, filename), 'r', encoding='utf-8') as f:
+                    presets[preset_name] = f.read().strip()
+            except:
+                pass
+
+    return presets
+
+def save_text_to_file(text: str, filename: str = "result.txt") -> str:
+    """Save text to a temporary file and return the path"""
+    temp_file = os.path.join(TEMP_DIR, filename)
+    with open(temp_file, 'w', encoding='utf-8') as f:
+        f.write(text)
+    return temp_file
+
+def stop_generation():
+    """Set the stop flag to True"""
+    global stop_generation_flag
+    stop_generation_flag = True
+    return "🛑 Stopping generation..."
+
+def reset_stop_flag():
+    """Reset the stop flag"""
+    global stop_generation_flag
+    stop_generation_flag = False
 
 # Custom CSS for beautiful UI
 CUSTOM_CSS = """
@@ -300,7 +421,19 @@ TRANSLATIONS = {
         "generation_complete": "✅ Generation complete!",
         "seconds": "seconds",
         "processing_image": "Processing image",
-        "of": "of"
+        "of": "of",
+        "extra_options": "Extra Options",
+        "extra_options_info": "Additional modifiers for description",
+        "character_name": "Character/Person Name",
+        "character_name_placeholder": "e.g., John, Alice, or leave empty",
+        "character_name_info": "If provided, will use this name instead of generic terms",
+        "prompt_preset": "Prompt Preset",
+        "prompt_preset_info": "Load a preset from prompts/ folder",
+        "refresh_presets": "Refresh",
+        "memory_usage": "Memory Usage",
+        "download_result": "Download Result",
+        "generation_stopped": "Generation stopped by user",
+        "stopping": "Stopping..."
     },
     "ru": {
         "title": "Генератор описаний изображений Qwen VL",
@@ -333,13 +466,13 @@ TRANSLATIONS = {
         "result": "Результат",
         "upload_images": "Загрузите изображения",
         "prompts_multiline": "Промты (по одному на строку)",
-        "prompts_placeholder": "Создать описание товара для онлайн магазина\nСоздать SEO Description для товара\n...",
+        "prompts_placeholder": "Создать описание товара для онлайн магазина\nСоздать SEO-описание для товара\n...",
         "prompts_info": "Укажите один промт для всех изображений или по одному промту на каждое изображение",
         "process_batch_btn": "🚀 Обработать пакет",
         "results": "Результаты",
         "examples_title": "💡 Примеры промтов:",
         "example_1": "Создать описание товара ''  на русском языке",
-        "example_2": "Создать SEO Description для товара максимум 160 символов на русском языке",
+        "example_2": "Создать SEO-описание для товара максимум 160 символов на русском языке",
         "example_3": "Создать привлекательное описание продукта для маркетплейса на русском языке",
         "example_4": "Детально описать изображение для каталога товаров на русском языке",
         "error_no_image": "Пожалуйста, загрузите изображение или укажите URL изображения",
@@ -356,7 +489,7 @@ TRANSLATIONS = {
         "result_label": "Результат: {}",
         "model_size_warning": "⚠️ Примечание: Большие модели (8B+) могут использовать выгрузку на CPU при недостатке памяти GPU, что может замедлить генерацию.",
         "quantization": "Квантизация",
-        "quantization_info": "Оптимизация памяти (4-bit = ~75% меньше VRAM)",
+        "quantization_info": "Оптимизация памяти (4-bit = ~75% меньше видеопамяти)",
         "quant_4bit": "4-bit (Рекомендуется)",
         "quant_8bit": "8-bit (Лучше качество)",
         "quant_none": "Нет (Полная точность)",
@@ -385,7 +518,19 @@ TRANSLATIONS = {
         "generation_complete": "✅ Генерация завершена!",
         "seconds": "секунд",
         "processing_image": "Обработка изображения",
-        "of": "из"
+        "of": "из",
+        "extra_options": "Дополнительные опции",
+        "extra_options_info": "Дополнительные модификаторы описания",
+        "character_name": "Имя персонажа/человека",
+        "character_name_placeholder": "напр., Иван, Алиса, или оставьте пустым",
+        "character_name_info": "Если указано, будет использоваться вместо общих терминов",
+        "prompt_preset": "Пресет промпта",
+        "prompt_preset_info": "Загрузить пресет из папки prompts/",
+        "refresh_presets": "Обновить",
+        "memory_usage": "Использование памяти",
+        "download_result": "Скачать результат",
+        "generation_stopped": "Генерация остановлена пользователем",
+        "stopping": "Остановка..."
     },
     "zh": {
         "title": "Qwen VL 图像描述生成器",
@@ -470,7 +615,19 @@ TRANSLATIONS = {
         "generation_complete": "✅ 生成完成！",
         "seconds": "秒",
         "processing_image": "处理图像",
-        "of": "/"
+        "of": "/",
+        "extra_options": "额外选项",
+        "extra_options_info": "描述的额外修饰符",
+        "character_name": "角色/人物名称",
+        "character_name_placeholder": "例如：小明、小红，或留空",
+        "character_name_info": "如果提供，将使用此名称代替通用术语",
+        "prompt_preset": "提示词预设",
+        "prompt_preset_info": "从prompts/文件夹加载预设",
+        "refresh_presets": "刷新",
+        "memory_usage": "内存使用",
+        "download_result": "下载结果",
+        "generation_stopped": "用户停止了生成",
+        "stopping": "停止中..."
     }
 }
 
@@ -489,28 +646,64 @@ def get_description_lengths() -> list:
     """Get description lengths for current language"""
     return list(DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"]).keys())
 
-def build_prompt(description_type: str, description_length: str, custom_prompt: str, base_prompt: str = "") -> str:
-    """Build the final prompt based on type, length, and custom input"""
-    # If custom prompt is provided, use it
+def get_extra_options() -> list:
+    """Get extra options for current language"""
+    return list(EXTRA_OPTIONS.get(current_language, EXTRA_OPTIONS["en"]).keys())
+
+def get_extra_option_prompt(option: str) -> str:
+    """Get the prompt text for an extra option"""
+    options_dict = EXTRA_OPTIONS.get(current_language, EXTRA_OPTIONS["en"])
+    return options_dict.get(option, "")
+
+def build_prompt(
+    description_type: str,
+    description_length: str,
+    custom_prompt: str,
+    base_prompt: str = "",
+    extra_options: list = None,
+    character_name: str = ""
+) -> str:
+    """Build the final prompt based on type, length, custom input, extra options and character name"""
+    # If custom prompt is provided, use it (but still add character name if present)
     if custom_prompt and custom_prompt.strip():
-        return custom_prompt.strip()
+        final_prompt = custom_prompt.strip()
+    else:
+        # Get type prompt
+        types_dict = DESCRIPTION_TYPES.get(current_language, DESCRIPTION_TYPES["en"])
+        type_prompt = types_dict.get(description_type, "")
 
-    # Get type prompt
-    types_dict = DESCRIPTION_TYPES.get(current_language, DESCRIPTION_TYPES["en"])
-    type_prompt = types_dict.get(description_type, "")
+        # If type is Custom, use base prompt
+        if not type_prompt:
+            type_prompt = base_prompt if base_prompt else "Describe this image."
 
-    # If type is Custom, use base prompt
-    if not type_prompt:
-        type_prompt = base_prompt if base_prompt else "Describe this image."
+        # Get length modifier
+        lengths_dict = DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"])
+        length_modifier = lengths_dict.get(description_length, "")
 
-    # Get length modifier
-    lengths_dict = DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"])
-    length_modifier = lengths_dict.get(description_length, "")
+        # Combine type and length
+        if length_modifier:
+            final_prompt = f"{type_prompt} {length_modifier}"
+        else:
+            final_prompt = type_prompt
 
-    # Combine prompts
-    if length_modifier:
-        return f"{type_prompt} {length_modifier}"
-    return type_prompt
+    # Add character name instruction if provided
+    if character_name and character_name.strip():
+        name = character_name.strip()
+        if current_language == "ru":
+            final_prompt += f" Если на изображении есть человек или персонаж, используй имя '{name}' вместо общих терминов."
+        elif current_language == "zh":
+            final_prompt += f" 如果图片中有人或角色，请使用名字'{name}'而不是通用术语。"
+        else:
+            final_prompt += f" If there is a person or character in the image, use the name '{name}' instead of generic terms."
+
+    # Add extra options
+    if extra_options:
+        for option in extra_options:
+            option_prompt = get_extra_option_prompt(option)
+            if option_prompt:
+                final_prompt += f" {option_prompt}"
+
+    return final_prompt
 
 def create_output_folder(folder_name: str = None) -> str:
     """Create and return path to output folder"""
@@ -770,6 +963,8 @@ def process_single_image(
     description_type: str,
     description_length: str,
     custom_prompt: str,
+    extra_options: list,
+    character_name: str,
     num_variants: int,
     model_name: str,
     quantization: str,
@@ -781,17 +976,23 @@ def process_single_image(
     progress=gr.Progress(track_tqdm=True)
 ) -> Generator:
     """Обработка одного изображения с генерацией нескольких вариантов"""
+    global stop_generation_flag
+    reset_stop_flag()
     start_time = time.time()
 
     # Check if we have either uploaded image or URL
     if image is None and not image_url.strip():
-        yield get_text("error_no_image"), "", []
+        yield get_text("error_no_image"), "", [], None
         return
 
-    # Build prompt from type, length and custom
-    final_prompt = build_prompt(description_type, description_length, custom_prompt)
+    # Build prompt from type, length, custom, extra options and character name
+    final_prompt = build_prompt(
+        description_type, description_length, custom_prompt,
+        extra_options=extra_options or [],
+        character_name=character_name or ""
+    )
     if not final_prompt.strip():
-        yield get_text("error_no_prompt"), "", []
+        yield get_text("error_no_prompt"), "", [], None
         return
 
     temp_path = None
@@ -800,7 +1001,7 @@ def process_single_image(
     try:
         # Priority: URL over uploaded image (if both provided, URL takes precedence)
         if image_url and image_url.strip():
-            yield f"⏳ {get_text('generating')} (loading from URL...)", final_prompt, []
+            yield f"⏳ {get_text('generating')} (loading from URL...)", final_prompt, [], None
             image_path = load_image_from_url(image_url.strip())
             temp_path = image_path
         elif hasattr(image, 'shape'):
@@ -813,9 +1014,16 @@ def process_single_image(
 
         results = []
         for i in range(num_variants):
+            # Check stop flag
+            if stop_generation_flag:
+                elapsed_time = time.time() - start_time
+                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None
+                return
+
             variant_seed = seed if seed == -1 else seed + i
-            status_msg = f"⏳ {get_text('generating')} ({get_text('variant')} {i+1}/{num_variants})"
-            yield status_msg, final_prompt, results
+            memory_info = get_memory_info()
+            status_msg = f"⏳ {get_text('generating')} ({get_text('variant')} {i+1}/{num_variants}) | {memory_info}"
+            yield status_msg, final_prompt, results, None
 
             result = generator.generate_description(
                 image_path=image_path,
@@ -832,12 +1040,19 @@ def process_single_image(
 
         # Calculate processing time
         elapsed_time = time.time() - start_time
-        final_status = f"{get_text('generation_complete')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})"
+        memory_info = get_memory_info()
+        final_status = f"{get_text('generation_complete')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')}) | {memory_info}"
 
-        yield final_status, final_prompt, results
+        # Prepare download file
+        download_path = None
+        if results:
+            all_text = "\n\n".join([f"=== Variant {i+1} ===\n{r}" for i, r in enumerate(results)])
+            download_path = save_text_to_file(all_text, f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+
+        yield final_status, final_prompt, results, download_path
 
     except Exception as e:
-        yield f"❌ Error: {str(e)}", final_prompt, []
+        yield f"❌ Error: {str(e)}", final_prompt, [], None
     finally:
         # Удаляем временный файл
         if temp_path and os.path.exists(temp_path):
@@ -856,6 +1071,8 @@ def process_batch_images(
     description_type: str,
     description_length: str,
     custom_prompt: str,
+    extra_options: list,
+    character_name: str,
     num_variants: int,
     output_folder_name: str,
     export_formats: List[str],
@@ -869,16 +1086,22 @@ def process_batch_images(
     progress=gr.Progress(track_tqdm=True)
 ) -> Generator:
     """Обработка пакета изображений с прогресс-баром и экспортом"""
+    global stop_generation_flag
+    reset_stop_flag()
     start_time = time.time()
 
     if not files:
-        yield get_text("error_no_images"), ""
+        yield get_text("error_no_images"), "", None
         return
 
-    # Build prompt from type, length and custom
-    final_prompt = build_prompt(description_type, description_length, custom_prompt)
+    # Build prompt from type, length, custom, extra options and character name
+    final_prompt = build_prompt(
+        description_type, description_length, custom_prompt,
+        extra_options=extra_options or [],
+        character_name=character_name or ""
+    )
     if not final_prompt.strip():
-        yield get_text("error_no_prompts"), ""
+        yield get_text("error_no_prompts"), "", None
         return
 
     num_variants = int(num_variants)
@@ -890,15 +1113,28 @@ def process_batch_images(
     output_folder = create_output_folder(output_folder_name)
 
     for idx, file in enumerate(progress.tqdm(files, desc="Processing images")):
+        # Check stop flag
+        if stop_generation_flag:
+            elapsed_time = time.time() - start_time
+            final_status = f"🛑 {get_text('generation_stopped')}\n"
+            final_status += f"📊 {idx} {get_text('of')} {total_files} images processed in {elapsed_time:.1f} {get_text('seconds')}"
+            yield final_status, "\n".join(output_lines), None
+            return
+
         image_path = file.name if hasattr(file, 'name') else file
         filename = os.path.basename(image_path)
 
-        # Status update
-        status_msg = f"⏳ {get_text('processing_image')} {idx + 1} {get_text('of')} {total_files}: {filename}"
-        yield status_msg, "\n".join(output_lines)
+        # Status update with memory info
+        memory_info = get_memory_info()
+        status_msg = f"⏳ {get_text('processing_image')} {idx + 1} {get_text('of')} {total_files}: {filename} | {memory_info}"
+        yield status_msg, "\n".join(output_lines), None
 
         descriptions = []
         for v in range(num_variants):
+            # Check stop flag between variants
+            if stop_generation_flag:
+                break
+
             variant_seed = seed if seed == -1 else seed + idx * num_variants + v
 
             result = generator.generate_description(
@@ -913,6 +1149,9 @@ def process_batch_images(
                 seed=variant_seed
             )
             descriptions.append(result)
+
+        if not descriptions:
+            continue
 
         # Store result
         all_results.append({
@@ -932,11 +1171,11 @@ def process_batch_images(
                 output_lines.append(f"\n--- {get_text('variant')} {v_idx} ---")
             output_lines.append(f"{desc}\n")
 
-        yield status_msg, "\n".join(output_lines)
+        yield status_msg, "\n".join(output_lines), None
 
     # Save results in selected formats
     saved_paths = []
-    if export_formats:
+    if export_formats and all_results:
         if "TXT" in export_formats:
             txt_files = save_results_txt(all_results, output_folder)
             saved_paths.extend(txt_files)
@@ -951,14 +1190,20 @@ def process_batch_images(
 
     # Calculate total time
     elapsed_time = time.time() - start_time
+    memory_info = get_memory_info()
 
     # Final status
     final_status = f"{get_text('generation_complete')}\n"
-    final_status += f"📊 {total_files} images processed in {elapsed_time:.1f} {get_text('seconds')}\n"
+    final_status += f"📊 {total_files} images processed in {elapsed_time:.1f} {get_text('seconds')} | {memory_info}\n"
     if saved_paths:
         final_status += f"💾 Results saved to: {output_folder}"
 
-    yield final_status, "\n".join(output_lines)
+    # Prepare download file for batch results
+    download_path = None
+    if all_results:
+        download_path = save_text_to_file("\n".join(output_lines), f"batch_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+
+    yield final_status, "\n".join(output_lines), download_path
 
     # Clean up GPU memory
     gc.collect()
@@ -984,11 +1229,16 @@ def create_interface():
         theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="purple", neutral_hue="slate"),
         css=CUSTOM_CSS
     ) as demo:
-        # Beautiful gradient header
+        # Beautiful gradient header with credits
         gr.HTML("""
         <div class="main-header">
             <h1>🖼️ Qwen VL Image Description Generator PRO</h1>
             <p>Advanced AI-powered image description with multiple styles and export options</p>
+            <p style="font-size: 0.9rem; margin-top: 0.75rem; opacity: 0.85;">
+                Developed by <a href="#">NeuralSoft</a> |
+                Powered by <a href="https://huggingface.co/Qwen" target="_blank">Qwen Vision Models</a> |
+                <a href="https://github.com/timoncool/qwen3-vl" target="_blank">GitHub</a>
+            </p>
         </div>
         """)
 
@@ -1110,6 +1360,22 @@ def create_interface():
                         )
 
                         gr.Markdown("### 📝 Description Settings")
+
+                        # Prompt preset dropdown
+                        with gr.Row():
+                            single_preset = gr.Dropdown(
+                                choices=list(load_prompt_presets().keys()),
+                                value="None",
+                                label=get_text("prompt_preset"),
+                                info=get_text("prompt_preset_info"),
+                                scale=4
+                            )
+                            single_refresh_presets = gr.Button(
+                                get_text("refresh_presets"),
+                                size="sm",
+                                scale=1
+                            )
+
                         single_desc_type = gr.Dropdown(
                             choices=get_description_types(),
                             value=get_description_types()[0],
@@ -1131,6 +1397,23 @@ def create_interface():
                             info=get_text("num_variants_info")
                         )
 
+                        # Character name field
+                        single_character_name = gr.Textbox(
+                            label=get_text("character_name"),
+                            placeholder=get_text("character_name_placeholder"),
+                            info=get_text("character_name_info"),
+                            lines=1
+                        )
+
+                        # Extra options
+                        with gr.Accordion(get_text("extra_options"), open=False):
+                            single_extra_options = gr.CheckboxGroup(
+                                choices=get_extra_options(),
+                                value=[],
+                                label="",
+                                info=get_text("extra_options_info")
+                            )
+
                         with gr.Accordion(get_text("custom_prompt_override"), open=False):
                             single_custom_prompt = gr.Textbox(
                                 placeholder=get_text("custom_prompt_placeholder"),
@@ -1138,11 +1421,18 @@ def create_interface():
                                 label=""
                             )
 
-                        single_submit_btn = gr.Button(
-                            get_text("generate_btn"),
-                            variant="primary",
-                            elem_classes="generate-btn"
-                        )
+                        with gr.Row():
+                            single_submit_btn = gr.Button(
+                                get_text("generate_btn"),
+                                variant="primary",
+                                elem_classes="generate-btn",
+                                scale=3
+                            )
+                            single_stop_btn = gr.Button(
+                                get_text("stop_btn"),
+                                variant="stop",
+                                scale=1
+                            )
 
                     with gr.Column(scale=1, elem_classes="card-style"):
                         gr.Markdown("### 📊 Results")
@@ -1168,6 +1458,12 @@ def create_interface():
                                 )
                                 single_outputs.append((variant_group, variant_output))
 
+                        # Download result file
+                        single_download = gr.File(
+                            label=get_text("download_result"),
+                            visible=True
+                        )
+
                 # Кликабельные примеры промтов
                 examples_title = gr.Markdown(f"### {get_text('examples_title')}")
 
@@ -1184,6 +1480,22 @@ def create_interface():
                         )
 
                         gr.Markdown("### 📝 Description Settings")
+
+                        # Prompt preset dropdown
+                        with gr.Row():
+                            batch_preset = gr.Dropdown(
+                                choices=list(load_prompt_presets().keys()),
+                                value="None",
+                                label=get_text("prompt_preset"),
+                                info=get_text("prompt_preset_info"),
+                                scale=4
+                            )
+                            batch_refresh_presets = gr.Button(
+                                get_text("refresh_presets"),
+                                size="sm",
+                                scale=1
+                            )
+
                         batch_desc_type = gr.Dropdown(
                             choices=get_description_types(),
                             value=get_description_types()[0],
@@ -1205,6 +1517,23 @@ def create_interface():
                             info=get_text("num_variants_info")
                         )
 
+                        # Character name field
+                        batch_character_name = gr.Textbox(
+                            label=get_text("character_name"),
+                            placeholder=get_text("character_name_placeholder"),
+                            info=get_text("character_name_info"),
+                            lines=1
+                        )
+
+                        # Extra options
+                        with gr.Accordion(get_text("extra_options"), open=False):
+                            batch_extra_options = gr.CheckboxGroup(
+                                choices=get_extra_options(),
+                                value=[],
+                                label="",
+                                info=get_text("extra_options_info")
+                            )
+
                         with gr.Accordion(get_text("custom_prompt_override"), open=False):
                             batch_custom_prompt = gr.Textbox(
                                 placeholder=get_text("custom_prompt_placeholder"),
@@ -1224,11 +1553,18 @@ def create_interface():
                             label=get_text("export_format")
                         )
 
-                        batch_submit_btn = gr.Button(
-                            get_text("process_batch_btn"),
-                            variant="primary",
-                            elem_classes="generate-btn"
-                        )
+                        with gr.Row():
+                            batch_submit_btn = gr.Button(
+                                get_text("process_batch_btn"),
+                                variant="primary",
+                                elem_classes="generate-btn",
+                                scale=3
+                            )
+                            batch_stop_btn = gr.Button(
+                                get_text("stop_btn"),
+                                variant="stop",
+                                scale=1
+                            )
 
                     with gr.Column(scale=1, elem_classes="card-style"):
                         gr.Markdown("### 📊 Results")
@@ -1239,8 +1575,14 @@ def create_interface():
                         )
                         batch_output = gr.Textbox(
                             label=get_text("results"),
-                            lines=25,
+                            lines=20,
                             show_copy_button=True
+                        )
+
+                        # Download result file
+                        batch_download = gr.File(
+                            label=get_text("download_result"),
+                            visible=True
                         )
         
         # Обработчики событий
@@ -1261,6 +1603,10 @@ def create_interface():
                 gr.update(choices=get_description_lengths(), value=get_description_lengths()[0]),  # single_desc_length
                 gr.update(choices=get_description_types(), value=get_description_types()[0]),  # batch_desc_type
                 gr.update(choices=get_description_lengths(), value=get_description_lengths()[0]),  # batch_desc_length
+                gr.update(choices=get_extra_options(), value=[]),  # single_extra_options
+                gr.update(choices=get_extra_options(), value=[]),  # batch_extra_options
+                gr.update(value=get_text("stop_btn")),  # single_stop_btn
+                gr.update(value=get_text("stop_btn")),  # batch_stop_btn
             ]
 
         language_dropdown.change(
@@ -1278,7 +1624,56 @@ def create_interface():
                 single_desc_length,
                 batch_desc_type,
                 batch_desc_length,
+                single_extra_options,
+                batch_extra_options,
+                single_stop_btn,
+                batch_stop_btn,
             ]
+        )
+
+        # Stop button handlers
+        single_stop_btn.click(
+            fn=stop_generation,
+            outputs=single_status
+        )
+
+        batch_stop_btn.click(
+            fn=stop_generation,
+            outputs=batch_status
+        )
+
+        # Preset refresh handlers
+        def refresh_presets():
+            presets = load_prompt_presets()
+            return gr.update(choices=list(presets.keys()), value="None")
+
+        single_refresh_presets.click(
+            fn=refresh_presets,
+            outputs=single_preset
+        )
+
+        batch_refresh_presets.click(
+            fn=refresh_presets,
+            outputs=batch_preset
+        )
+
+        # Preset selection handlers (load preset text into custom prompt)
+        def load_preset(preset_name):
+            presets = load_prompt_presets()
+            if preset_name and preset_name != "None":
+                return presets.get(preset_name, "")
+            return ""
+
+        single_preset.change(
+            fn=load_preset,
+            inputs=single_preset,
+            outputs=single_custom_prompt
+        )
+
+        batch_preset.change(
+            fn=load_preset,
+            inputs=batch_preset,
+            outputs=batch_custom_prompt
         )
 
         random_seed_btn.click(
@@ -1300,14 +1695,19 @@ def create_interface():
         )
 
         # Single image processing with button lock
-        def process_single_wrapper(image, image_url, desc_type, desc_length, custom_prompt, num_variants,
+        def process_single_wrapper(image, image_url, desc_type, desc_length, custom_prompt,
+                                   extra_options, character_name, num_variants,
                                    model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
             # Disable button at start
-            yield gr.update(value=get_text("generating"), interactive=False), "", "", *[gr.update(value="") for _ in range(5)]
+            yield gr.update(value=get_text("generating"), interactive=False), "", "", *[gr.update(value="") for _ in range(5)], None
+
+            results = []
+            download_path = None
 
             # Process and yield results
-            for status, prompt_used, results in process_single_image(
-                image, image_url, desc_type, desc_length, custom_prompt, num_variants,
+            for status, prompt_used, results, download_path in process_single_image(
+                image, image_url, desc_type, desc_length, custom_prompt,
+                extra_options, character_name, num_variants,
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed
             ):
                 # Prepare outputs for each variant box
@@ -1318,7 +1718,7 @@ def create_interface():
                     else:
                         variant_outputs.append(gr.update(value=""))
 
-                yield gr.update(value=get_text("generating"), interactive=False), status, prompt_used, *variant_outputs
+                yield gr.update(value=get_text("generating"), interactive=False), status, prompt_used, *variant_outputs, download_path
 
             # Re-enable button at end
             final_outputs = []
@@ -1328,7 +1728,7 @@ def create_interface():
                 else:
                     final_outputs.append(gr.update(value=""))
 
-            yield gr.update(value=get_text("generate_btn"), interactive=True), status, prompt_used, *final_outputs
+            yield gr.update(value=get_text("generate_btn"), interactive=True), status, prompt_used, *final_outputs, download_path
 
         single_submit_btn.click(
             fn=process_single_wrapper,
@@ -1338,6 +1738,8 @@ def create_interface():
                 single_desc_type,
                 single_desc_length,
                 single_custom_prompt,
+                single_extra_options,
+                single_character_name,
                 single_num_variants,
                 model_dropdown,
                 quantization_dropdown,
@@ -1347,26 +1749,30 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs]
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
         )
 
         # Batch processing with button lock
-        def process_batch_wrapper(files, desc_type, desc_length, custom_prompt, num_variants,
+        def process_batch_wrapper(files, desc_type, desc_length, custom_prompt,
+                                  extra_options, character_name, num_variants,
                                   output_folder, export_formats, model_name, quantization,
                                   max_tokens, temperature, top_p, top_k, seed):
             # Disable button at start
-            yield gr.update(value=get_text("generating"), interactive=False), "", ""
+            yield gr.update(value=get_text("generating"), interactive=False), "", "", None
+
+            download_path = None
 
             # Process and yield results
-            for status, output_text in process_batch_images(
-                files, desc_type, desc_length, custom_prompt, num_variants,
+            for status, output_text, download_path in process_batch_images(
+                files, desc_type, desc_length, custom_prompt,
+                extra_options, character_name, num_variants,
                 output_folder, export_formats, model_name, quantization,
                 max_tokens, temperature, top_p, top_k, seed
             ):
-                yield gr.update(value=get_text("generating"), interactive=False), status, output_text
+                yield gr.update(value=get_text("generating"), interactive=False), status, output_text, download_path
 
             # Re-enable button at end
-            yield gr.update(value=get_text("process_batch_btn"), interactive=True), status, output_text
+            yield gr.update(value=get_text("process_batch_btn"), interactive=True), status, output_text, download_path
 
         batch_submit_btn.click(
             fn=process_batch_wrapper,
@@ -1375,6 +1781,8 @@ def create_interface():
                 batch_desc_type,
                 batch_desc_length,
                 batch_custom_prompt,
+                batch_extra_options,
+                batch_character_name,
                 batch_num_variants,
                 batch_output_folder,
                 batch_export_formats,
@@ -1386,7 +1794,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[batch_submit_btn, batch_status, batch_output]
+            outputs=[batch_submit_btn, batch_status, batch_output, batch_download]
         )
 
         return demo
