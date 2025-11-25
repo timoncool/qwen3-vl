@@ -1,0 +1,408 @@
+# Kubernetes Deployment Configuration for Qwen3-VL
+# This configuration deploys the application on Kubernetes with GPU support
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qwen3-vl
+  labels:
+    name: qwen3-vl
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qwen3-vl-config
+  namespace: qwen3-vl
+data:
+  MODEL_NAME: "Qwen/Qwen2-VL-2B-Instruct"
+  QUANTIZATION: "4-bit"
+  GRADIO_SERVER_NAME: "0.0.0.0"
+  GRADIO_SERVER_PORT: "7860"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+
+---
+# PersistentVolumeClaim for model cache
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache-pvc
+  namespace: qwen3-vl
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Adjust based on model size
+  storageClassName: standard  # Use appropriate storage class
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-vl
+  namespace: qwen3-vl
+  labels:
+    app: qwen3-vl
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Zero downtime deployment
+  selector:
+    matchLabels:
+      app: qwen3-vl
+  template:
+    metadata:
+      labels:
+        app: qwen3-vl
+        version: v1
+      annotations:
+        # Prometheus annotations for metrics scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Node selector for GPU nodes
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+        # For AWS: node.kubernetes.io/instance-type: g4dn.xlarge
+        # For Azure: accelerator: nvidia-t4
+
+      # Anti-affinity to spread pods across different nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - qwen3-vl
+              topologyKey: kubernetes.io/hostname
+
+      # Init container to download models
+      initContainers:
+      - name: model-downloader
+        image: python:3.11-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Downloading model..."
+            pip install --no-cache-dir huggingface_hub
+            python -c "
+            from huggingface_hub import snapshot_download
+            import os
+            model_name = os.getenv('MODEL_NAME', 'Qwen/Qwen2-VL-2B-Instruct')
+            print(f'Downloading {model_name}...')
+            snapshot_download(model_name, cache_dir='/models')
+            print('Download complete!')
+            "
+        env:
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: qwen3-vl-config
+              key: MODEL_NAME
+        volumeMounts:
+        - name: model-cache
+          mountPath: /models
+
+      containers:
+      - name: qwen3-vl
+        image: gcr.io/your-project/qwen3-vl:latest
+        imagePullPolicy: Always
+
+        ports:
+        - name: http-api
+          containerPort: 8000
+          protocol: TCP
+        - name: http-ui
+          containerPort: 7860
+          protocol: TCP
+
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: TRANSFORMERS_CACHE
+          value: "/models"
+        - name: HF_HOME
+          value: "/models"
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: qwen3-vl-config
+              key: MODEL_NAME
+        - name: QUANTIZATION
+          valueFrom:
+            configMapKeyRef:
+              name: qwen3-vl-config
+              key: QUANTIZATION
+
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+
+        # Liveness probe - checks if container is alive
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300  # 5 minutes for model loading
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+
+        # Readiness probe - checks if container is ready to serve traffic
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+
+        # Startup probe - for slow-starting containers
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # Allow up to 5 minutes for startup
+
+        volumeMounts:
+        - name: model-cache
+          mountPath: /models
+        - name: output
+          mountPath: /app/output
+        - name: temp
+          mountPath: /app/temp
+
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache-pvc
+      - name: output
+        emptyDir: {}
+      - name: temp
+        emptyDir: {}
+
+      # Graceful shutdown
+      terminationGracePeriodSeconds: 60
+
+---
+# Service for API
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-vl-api
+  namespace: qwen3-vl
+  labels:
+    app: qwen3-vl
+    service: api
+spec:
+  type: ClusterIP
+  selector:
+    app: qwen3-vl
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  sessionAffinity: ClientIP  # Sticky sessions
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# Service for UI
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-vl-ui
+  namespace: qwen3-vl
+  labels:
+    app: qwen3-vl
+    service: ui
+spec:
+  type: ClusterIP
+  selector:
+    app: qwen3-vl
+  ports:
+  - name: http
+    port: 7860
+    targetPort: 7860
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qwen3-vl-ingress
+  namespace: qwen3-vl
+  annotations:
+    # NGINX ingress annotations
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # SSL redirect (uncomment in production)
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    # CORS (adjust for your needs)
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: qwen3-vl.example.com  # Replace with your domain
+    http:
+      paths:
+      # API endpoints
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: qwen3-vl-api
+            port:
+              number: 8000
+      # Health check
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: qwen3-vl-api
+            port:
+              number: 8000
+      # Metrics
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: qwen3-vl-api
+            port:
+              number: 8000
+      # UI
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: qwen3-vl-ui
+            port:
+              number: 7860
+  # TLS configuration (uncomment and configure in production)
+  # tls:
+  # - hosts:
+  #   - qwen3-vl.example.com
+  #   secretName: qwen3-vl-tls
+
+---
+# HorizontalPodAutoscaler for auto-scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: qwen3-vl-hpa
+  namespace: qwen3-vl
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: qwen3-vl
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# PodDisruptionBudget to ensure availability during updates
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: qwen3-vl-pdb
+  namespace: qwen3-vl
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: qwen3-vl
+
+---
+# ServiceMonitor for Prometheus (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: qwen3-vl-metrics
+  namespace: qwen3-vl
+  labels:
+    app: qwen3-vl
+spec:
+  selector:
+    matchLabels:
+      app: qwen3-vl
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
