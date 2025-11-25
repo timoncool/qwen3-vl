@@ -1758,6 +1758,7 @@ def create_interface():
             fn=process_single_wrapper,
             inputs=[
                 single_image,
+                single_video,
                 single_image_url,
                 single_desc_type,
                 single_desc_length,
@@ -1774,6 +1775,41 @@ def create_interface():
                 seed_number
             ],
             outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+        
+        # Preset handlers
+        def refresh_presets_list():
+            presets = load_prompt_presets()
+            return gr.update(choices=list(presets.keys()), value="None")
+        
+        single_refresh_presets.click(
+            fn=refresh_presets_list,
+            outputs=single_preset
+        )
+        
+        def load_preset(preset_name):
+            if preset_name and preset_name != "None":
+                presets = load_prompt_presets()
+                return presets.get(preset_name, "")
+            return ""
+        
+        single_preset.change(
+            fn=load_preset,
+            inputs=single_preset,
+            outputs=single_custom_prompt
+        )
+        
+        def save_preset(name, prompt):
+            if not name:
+                return "❌ Please enter a preset name"
+            msg = save_prompt_preset(name, prompt)
+            new_presets = list(load_prompt_presets().keys())
+            return msg, gr.update(choices=new_presets, value=name if "successfully" in msg else None)
+        
+        single_save_preset_btn.click(
+            fn=save_preset,
+            inputs=[single_save_preset_name, single_custom_prompt],
+            outputs=[single_save_preset_status, single_preset]
         )
 
         # Batch processing with button lock
