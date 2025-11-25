@@ -1,6 +1,6 @@
 import gradio as gr
 import torch
-from transformers import Qwen3VLForConditionalGeneration, AutoProcessor, BitsAndBytesConfig
+from transformers import Qwen3VLForConditionalGeneration, AutoProcessor, BitsAndBytesConfig, TextIteratorStreamer
 from qwen_vl_utils import process_vision_info
 from PIL import Image
 import random
@@ -17,6 +17,7 @@ import shutil
 from datetime import datetime
 import time
 import tempfile
+from threading import Thread
 
 # Optional: psutil for memory monitoring
 try:
@@ -45,7 +46,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATASETS_DIR, exist_ok=True)
 os.makedirs(PROMPTS_DIR, exist_ok=True)
 
-# Extra options for description enhancement
+# Extra options for description enhancement (IMAGE)
 EXTRA_OPTIONS = {
     "en": {
         "Include lighting info": "Include information about lighting.",
@@ -91,6 +92,40 @@ EXTRA_OPTIONS = {
     }
 }
 
+# Extra options for VIDEO description enhancement
+EXTRA_OPTIONS_VIDEO = {
+    "en": {
+        "Describe camera movement": "Describe camera movements (panning, zooming, static, etc.).",
+        "Include audio description": "If the video has audio, describe it (music, speech, sound effects).",
+        "Describe plot/story": "Describe the plot or story progression in the video.",
+        "Include lighting info": "Include information about lighting changes throughout the video.",
+        "Include editing style": "Describe the editing style (cuts, transitions, effects).",
+        "Keep it SFW/PG": "Do NOT include anything sexual; keep it PG.",
+        "Describe only key moments": "ONLY describe the most important moments in the video.",
+        "Include aesthetic quality": "Include information about the subjective aesthetic quality from low to very high."
+    },
+    "ru": {
+        "Описать движение камеры": "Опиши движения камеры (панорамирование, зум, статичная и т.д.).",
+        "Добавить описание звука": "Если в видео есть звук, опиши его (музыка, речь, звуковые эффекты).",
+        "Описать сюжет/историю": "Опиши сюжет или развитие истории в видео.",
+        "Добавить информацию об освещении": "Добавь информацию об изменениях освещения в течение видео.",
+        "Добавить стиль монтажа": "Опиши стиль монтажа (переходы, эффекты).",
+        "Сохранить SFW/PG рейтинг": "НЕ включай сексуальный контент, сохраняй рейтинг PG.",
+        "Описывать только ключевые моменты": "Описывай ТОЛЬКО самые важные моменты видео.",
+        "Добавить эстетическую оценку": "Добавь информацию о субъективном эстетическом качестве от низкого до очень высокого."
+    },
+    "zh": {
+        "描述镜头运动": "描述镜头运动（平移、缩放、静止等）。",
+        "包含音频描述": "如果视频有音频，描述它（音乐、语音、音效）。",
+        "描述情节/故事": "描述视频中的情节或故事发展。",
+        "包含光照信息": "包含视频中光照变化的信息。",
+        "包含剪辑风格": "描述剪辑风格（切换、过渡、效果）。",
+        "保持SFW/PG级别": "不要包含任何性相关内容，保持PG级别。",
+        "只描述关键时刻": "只描述视频中最重要的时刻。",
+        "包含美学质量评价": "包含从低到非常高的主观美学质量评价。"
+    }
+}
+
 def get_memory_info() -> str:
     """Get current memory usage information"""
     info_parts = []
@@ -133,6 +168,28 @@ def load_prompt_presets() -> dict:
                 pass
 
     return presets
+
+def save_prompt_preset(name: str, prompt: str) -> str:
+    """Save a prompt preset to the prompts directory"""
+    if not name or not name.strip():
+        return "❌ Please provide a preset name"
+
+    if not prompt or not prompt.strip():
+        return "❌ Please provide a prompt to save"
+
+    # Sanitize filename
+    safe_name = "".join(c for c in name if c.isalnum() or c in "_ -").strip()
+    if not safe_name:
+        return "❌ Invalid preset name"
+
+    try:
+        os.makedirs(PROMPTS_DIR, exist_ok=True)
+        filepath = os.path.join(PROMPTS_DIR, f"{safe_name}.txt")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(prompt.strip())
+        return f"✅ Preset '{safe_name}' saved successfully!"
+    except Exception as e:
+        return f"❌ Error saving preset: {str(e)}"
 
 def save_text_to_file(text: str, filename: str = "result.txt") -> str:
     """Save text to a temporary file and return the path"""
@@ -646,14 +703,16 @@ def get_description_lengths() -> list:
     """Get description lengths for current language"""
     return list(DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"]).keys())
 
-def get_extra_options() -> list:
-    """Get extra options for current language"""
-    return list(EXTRA_OPTIONS.get(current_language, EXTRA_OPTIONS["en"]).keys())
+def get_extra_options(is_video: bool = False) -> list:
+    """Get extra options for current language and media type"""
+    options_dict = EXTRA_OPTIONS_VIDEO if is_video else EXTRA_OPTIONS
+    return list(options_dict.get(current_language, options_dict["en"]).keys())
 
-def get_extra_option_prompt(option: str) -> str:
+def get_extra_option_prompt(option: str, is_video: bool = False) -> str:
     """Get the prompt text for an extra option"""
-    options_dict = EXTRA_OPTIONS.get(current_language, EXTRA_OPTIONS["en"])
-    return options_dict.get(option, "")
+    options_dict = EXTRA_OPTIONS_VIDEO if is_video else EXTRA_OPTIONS
+    lang_options = options_dict.get(current_language, options_dict["en"])
+    return lang_options.get(option, "")
 
 def build_prompt(
     description_type: str,
@@ -661,9 +720,11 @@ def build_prompt(
     custom_prompt: str,
     base_prompt: str = "",
     extra_options: list = None,
-    character_name: str = ""
+    character_name: str = "",
+    is_video: bool = False
 ) -> str:
-    """Build the final prompt based on type, length, custom input, extra options and character name"""
+    """Build the final prompt based on type, length, custom input, extra options and character name.
+    Automatically replaces 'image' with 'video' when is_video=True for context-aware prompts."""
     # If custom prompt is provided, use it (but still add character name if present)
     if custom_prompt and custom_prompt.strip():
         final_prompt = custom_prompt.strip()
@@ -674,7 +735,10 @@ def build_prompt(
 
         # If type is Custom, use base prompt
         if not type_prompt:
-            type_prompt = base_prompt if base_prompt else "Describe this image."
+            if is_video:
+                type_prompt = base_prompt if base_prompt else "Describe this video."
+            else:
+                type_prompt = base_prompt if base_prompt else "Describe this image."
 
         # Get length modifier
         lengths_dict = DESCRIPTION_LENGTHS.get(current_language, DESCRIPTION_LENGTHS["en"])
@@ -686,20 +750,40 @@ def build_prompt(
         else:
             final_prompt = type_prompt
 
+    # Context-aware: Replace "image" with "video" when processing video
+    if is_video:
+        # English replacements
+        final_prompt = final_prompt.replace(" image.", " video.")
+        final_prompt = final_prompt.replace(" image ", " video ")
+        final_prompt = final_prompt.replace("this image", "this video")
+        final_prompt = final_prompt.replace("the image", "the video")
+        final_prompt = final_prompt.replace("an image", "a video")
+        # Russian replacements
+        final_prompt = final_prompt.replace("изображения", "видео")
+        final_prompt = final_prompt.replace("изображении", "видео")
+        final_prompt = final_prompt.replace("изображение", "видео")
+        # Chinese replacements
+        final_prompt = final_prompt.replace("图片", "视频")
+        final_prompt = final_prompt.replace("图像", "视频")
+
     # Add character name instruction if provided
     if character_name and character_name.strip():
         name = character_name.strip()
+        media_term_ru = "видео" if is_video else "изображении"
+        media_term_zh = "视频" if is_video else "图片"
+        media_term_en = "video" if is_video else "image"
+
         if current_language == "ru":
-            final_prompt += f" Если на изображении есть человек или персонаж, используй имя '{name}' вместо общих терминов."
+            final_prompt += f" Если на {media_term_ru} есть человек или персонаж, используй имя '{name}' вместо общих терминов."
         elif current_language == "zh":
-            final_prompt += f" 如果图片中有人或角色，请使用名字'{name}'而不是通用术语。"
+            final_prompt += f" 如果{media_term_zh}中有人或角色，请使用名字'{name}'而不是通用术语。"
         else:
-            final_prompt += f" If there is a person or character in the image, use the name '{name}' instead of generic terms."
+            final_prompt += f" If there is a person or character in the {media_term_en}, use the name '{name}' instead of generic terms."
 
     # Add extra options
     if extra_options:
         for option in extra_options:
-            option_prompt = get_extra_option_prompt(option)
+            option_prompt = get_extra_option_prompt(option, is_video=is_video)
             if option_prompt:
                 final_prompt += f" {option_prompt}"
 
@@ -867,19 +951,20 @@ class ImageDescriptionGenerator:
         temperature: float = 0.6,
         top_p: float = 0.9,
         top_k: int = 50,
-        seed: int = -1
-    ) -> str:
-        """Генерация описания для одного изображения"""
+        seed: int = -1,
+        stream: bool = False
+    ) -> Generator[str, None, None] if False else str:
+        """Генерация описания для одного изображения с опциональным streaming"""
         try:
             # Загружаем модель если необходимо
             self.load_model(model_name, quantization)
-            
+
             # Устанавливаем seed если указан
             if seed != -1:
                 torch.manual_seed(seed)
                 if torch.cuda.is_available():
                     torch.cuda.manual_seed(seed)
-            
+
             # Подготавливаем сообщения для модели
             messages = [
                 {
@@ -893,12 +978,12 @@ class ImageDescriptionGenerator:
                     ],
                 }
             ]
-            
+
             # Подготавливаем текст для модели
             text = self.processor.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
             )
-            
+
             # Обрабатываем изображение и текст
             image_inputs, video_inputs = process_vision_info(messages)
             inputs = self.processor(
@@ -909,33 +994,70 @@ class ImageDescriptionGenerator:
                 return_tensors="pt",
             )
             inputs = inputs.to(self.device)
-            
-            # Генерируем ответ (inference_mode быстрее чем no_grad)
-            with torch.inference_mode():
-                generated_ids = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    top_p=top_p,
-                    top_k=top_k,
-                    do_sample=True if temperature > 0 else False,
-                    use_cache=True,  # KV кэширование для ускорения
+
+            # Streaming generation
+            if stream:
+                streamer = TextIteratorStreamer(
+                    self.processor.tokenizer,
+                    skip_special_tokens=True,
+                    skip_prompt=True
                 )
-            
-            # Декодируем результат
-            generated_ids_trimmed = [
-                out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-            ]
-            output_text = self.processor.batch_decode(
-                generated_ids_trimmed,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False
-            )
-            
-            return output_text[0]
-            
+
+                generation_kwargs = {
+                    **inputs,
+                    "max_new_tokens": max_new_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "do_sample": True if temperature > 0 else False,
+                    "use_cache": True,
+                    "streamer": streamer,
+                }
+
+                # Run generation in a separate thread
+                thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+                thread.start()
+
+                # Yield tokens as they come
+                generated_text = ""
+                for new_text in streamer:
+                    generated_text += new_text
+                    yield generated_text
+
+                thread.join()
+                return generated_text
+            else:
+                # Non-streaming generation (inference_mode быстрее чем no_grad)
+                with torch.inference_mode():
+                    generated_ids = self.model.generate(
+                        **inputs,
+                        max_new_tokens=max_new_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                        do_sample=True if temperature > 0 else False,
+                        use_cache=True,  # KV кэширование для ускорения
+                    )
+
+                # Декодируем результат
+                generated_ids_trimmed = [
+                    out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+                ]
+                output_text = self.processor.batch_decode(
+                    generated_ids_trimmed,
+                    skip_special_tokens=True,
+                    clean_up_tokenization_spaces=False
+                )
+
+                return output_text[0]
+
         except Exception as e:
-            return get_text("error_generation").format(str(e))
+            error_msg = get_text("error_generation").format(str(e))
+            if stream:
+                yield error_msg
+                return error_msg
+            else:
+                return error_msg
 
 # Создаем глобальный экземпляр генератора
 generator = ImageDescriptionGenerator()
@@ -974,9 +1096,10 @@ def process_single_image(
     top_p: float,
     top_k: int,
     seed: int,
+    use_streaming: bool = True,
     progress=gr.Progress(track_tqdm=True)
 ) -> Generator:
-    """Обработка одного изображения/видео с генерацией нескольких вариантов"""
+    """Обработка одного изображения/видео с генерацией нескольких вариантов и streaming output"""
     global stop_generation_flag
     reset_stop_flag()
     start_time = time.time()
@@ -986,11 +1109,15 @@ def process_single_image(
         yield get_text("error_no_image"), "", [], None
         return
 
+    # Determine if processing video
+    is_video = video is not None
+
     # Build prompt from type, length, custom, extra options and character name
     final_prompt = build_prompt(
         description_type, description_length, custom_prompt,
         extra_options=extra_options or [],
-        character_name=character_name or ""
+        character_name=character_name or "",
+        is_video=is_video
     )
     if not final_prompt.strip():
         yield get_text("error_no_prompt"), "", [], None
@@ -1005,18 +1132,24 @@ def process_single_image(
             yield f"⏳ {get_text('generating')} (loading from URL...)", final_prompt, [], None
             image_path = load_image_from_url(image_url.strip())
             temp_path = image_path
+            is_video = False  # URLs are images
         elif video is not None:
             # Video uploaded - use it directly
             image_path = video
+            is_video = True
         elif hasattr(image, 'shape'):
             # Сохраняем временное изображение если это numpy array
             temp_path = os.path.join(TEMP_DIR, "temp_image.jpg")
             Image.fromarray(image).save(temp_path)
             image_path = temp_path
+            is_video = False
         else:
             image_path = image
+            is_video = False
 
         results = []
+        variant_times = []  # Track time for each variant
+
         for i in range(num_variants):
             # Check stop flag
             if stop_generation_flag:
@@ -1024,33 +1157,66 @@ def process_single_image(
                 yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None
                 return
 
+            variant_start = time.time()
             variant_seed = seed if seed == -1 else seed + i
             memory_info = get_memory_info()
             status_msg = f"⏳ {get_text('generating')} ({get_text('variant')} {i+1}/{num_variants}) | {memory_info}"
-            yield status_msg, final_prompt, results, None
 
-            result = generator.generate_description(
-                image_path=image_path,
-                prompt=final_prompt,
-                model_name=model_name,
-                quantization=quantization,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                top_k=top_k,
-                seed=variant_seed
-            )
+            if use_streaming:
+                # Stream the generation for real-time output
+                current_result = ""
+                for partial_result in generator.generate_description(
+                    image_path=image_path,
+                    prompt=final_prompt,
+                    model_name=model_name,
+                    quantization=quantization,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    seed=variant_seed,
+                    stream=True
+                ):
+                    if stop_generation_flag:
+                        break
+                    current_result = partial_result
+                    # Update results with streaming text
+                    temp_results = results + [current_result]
+                    yield status_msg, final_prompt, temp_results, None
+
+                result = current_result
+            else:
+                # Non-streaming generation
+                yield status_msg, final_prompt, results, None
+                result = generator.generate_description(
+                    image_path=image_path,
+                    prompt=final_prompt,
+                    model_name=model_name,
+                    quantization=quantization,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    seed=variant_seed,
+                    stream=False
+                )
+
+            variant_time = time.time() - variant_start
+            variant_times.append(variant_time)
             results.append(result)
 
         # Calculate processing time
         elapsed_time = time.time() - start_time
         memory_info = get_memory_info()
-        final_status = f"{get_text('generation_complete')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')}) | {memory_info}"
+
+        # Build detailed status with per-variant timing
+        timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}) | {memory_info}"
 
         # Prepare download file
         download_path = None
         if results:
-            all_text = "\n\n".join([f"=== Variant {i+1} ===\n{r}" for i, r in enumerate(results)])
+            all_text = "\n\n".join([f"=== Variant {i+1} (Time: {variant_times[i]:.1f}s) ===\n{r}" for i, r in enumerate(results)])
             download_path = save_text_to_file(all_text, f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
 
         yield final_status, final_prompt, results, download_path
@@ -1087,9 +1253,10 @@ def process_batch_images(
     top_p: float,
     top_k: int,
     seed: int,
+    is_video: bool = False,
     progress=gr.Progress(track_tqdm=True)
 ) -> Generator:
-    """Обработка пакета изображений с прогресс-баром и экспортом"""
+    """Обработка пакета изображений/видео с прогресс-баром и экспортом"""
     global stop_generation_flag
     reset_stop_flag()
     start_time = time.time()
@@ -1102,7 +1269,8 @@ def process_batch_images(
     final_prompt = build_prompt(
         description_type, description_length, custom_prompt,
         extra_options=extra_options or [],
-        character_name=character_name or ""
+        character_name=character_name or "",
+        is_video=is_video
     )
     if not final_prompt.strip():
         yield get_text("error_no_prompts"), "", None
@@ -1116,12 +1284,14 @@ def process_batch_images(
     # Create output folder
     output_folder = create_output_folder(output_folder_name)
 
-    for idx, file in enumerate(progress.tqdm(files, desc="Processing images")):
+    media_type = "video" if is_video else get_text('processing_image')
+
+    for idx, file in enumerate(progress.tqdm(files, desc=f"Processing {media_type}s")):
         # Check stop flag
         if stop_generation_flag:
             elapsed_time = time.time() - start_time
             final_status = f"🛑 {get_text('generation_stopped')}\n"
-            final_status += f"📊 {idx} {get_text('of')} {total_files} images processed in {elapsed_time:.1f} {get_text('seconds')}"
+            final_status += f"📊 {idx} {get_text('of')} {total_files} files processed in {elapsed_time:.1f} {get_text('seconds')}"
             yield final_status, "\n".join(output_lines), None
             return
 
@@ -1130,15 +1300,18 @@ def process_batch_images(
 
         # Status update with memory info
         memory_info = get_memory_info()
-        status_msg = f"⏳ {get_text('processing_image')} {idx + 1} {get_text('of')} {total_files}: {filename} | {memory_info}"
+        status_msg = f"⏳ Processing {idx + 1} {get_text('of')} {total_files}: {filename} | {memory_info}"
         yield status_msg, "\n".join(output_lines), None
 
         descriptions = []
+        variant_times = []
+
         for v in range(num_variants):
             # Check stop flag between variants
             if stop_generation_flag:
                 break
 
+            variant_start = time.time()
             variant_seed = seed if seed == -1 else seed + idx * num_variants + v
 
             result = generator.generate_description(
@@ -1150,8 +1323,11 @@ def process_batch_images(
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
-                seed=variant_seed
+                seed=variant_seed,
+                stream=False  # No streaming for batch to avoid complexity
             )
+            variant_time = time.time() - variant_start
+            variant_times.append(variant_time)
             descriptions.append(result)
 
         if not descriptions:
@@ -1165,14 +1341,15 @@ def process_batch_images(
             "description": descriptions[0] if descriptions else ""
         })
 
-        # Add to output
+        # Add to output with timing info
         output_lines.append(f"{'='*50}")
         output_lines.append(get_text("image_label").format(idx + 1, filename))
         output_lines.append(get_text("prompt_label").format(final_prompt))
 
         for v_idx, desc in enumerate(descriptions, 1):
             if num_variants > 1:
-                output_lines.append(f"\n--- {get_text('variant')} {v_idx} ---")
+                timing_info = f" ({variant_times[v_idx-1]:.1f}s)" if v_idx-1 < len(variant_times) else ""
+                output_lines.append(f"\n--- {get_text('variant')} {v_idx}{timing_info} ---")
             output_lines.append(f"{desc}\n")
 
         yield status_msg, "\n".join(output_lines), None
@@ -1352,10 +1529,12 @@ def create_interface():
                 with gr.Row():
                     with gr.Column(scale=1, elem_classes="card-style"):
                         gr.Markdown("### 📷 Input")
-                        
+
                         # Tabs for Image and Video
-                        with gr.Tabs():
-                            with gr.TabItem("🖼️ Image"):
+                        media_tabs = gr.Tabs()
+                        with media_tabs:
+                            image_tab = gr.TabItem("🖼️ Image")
+                            with image_tab:
                                 single_image = gr.Image(
                                     type="numpy",
                                     label=get_text("upload_image"),
@@ -1366,10 +1545,24 @@ def create_interface():
                                     placeholder=get_text("image_url_placeholder"),
                                     lines=1
                                 )
-                            with gr.TabItem("🎥 Video"):
+                                # Duplicate Generate button under image upload
+                                single_submit_btn_top = gr.Button(
+                                    get_text("generate_btn"),
+                                    variant="primary",
+                                    elem_classes="generate-btn"
+                                )
+
+                            video_tab = gr.TabItem("🎥 Video")
+                            with video_tab:
                                 single_video = gr.Video(
                                     label="Upload Video",
                                     height=300
+                                )
+                                # Duplicate Generate button under video upload
+                                single_submit_btn_top_video = gr.Button(
+                                    get_text("generate_btn"),
+                                    variant="primary",
+                                    elem_classes="generate-btn"
                                 )
 
                         gr.Markdown("### 📝 Description Settings")
@@ -1433,14 +1626,17 @@ def create_interface():
                             lines=1
                         )
 
-                        # Extra options
+                        # Extra options (will update based on media type)
                         with gr.Accordion(get_text("extra_options"), open=False):
                             single_extra_options = gr.CheckboxGroup(
-                                choices=get_extra_options(),
+                                choices=get_extra_options(is_video=False),  # Default to image
                                 value=[],
                                 label="",
-                                info=get_text("extra_options_info")
+                                info=get_text("extra_options_info"),
+                                elem_id="single_extra_options"
                             )
+                            # Hidden state to track if video is selected
+                            single_is_video = gr.State(value=False)
 
                         with gr.Accordion(get_text("custom_prompt_override"), open=False):
                             single_custom_prompt = gr.Textbox(
@@ -1495,125 +1691,265 @@ def create_interface():
                 # Кликабельные примеры промтов
                 examples_title = gr.Markdown(f"### {get_text('examples_title')}")
 
-            # Вкладка пакетной обработки
+            # Вкладка пакетной обработки - разделена на изображения и видео
             batch_tab = gr.TabItem(get_text("batch_processing"))
             with batch_tab:
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="card-style"):
-                        gr.Markdown("### 📁 Input Files")
-                        batch_images = gr.File(
-                            file_count="multiple",
-                            label=get_text("upload_images"),
-                            file_types=["image"]
-                        )
-
-                        gr.Markdown("### 📝 Description Settings")
-
-                        # Prompt preset dropdown
+                # Sub-tabs for images and videos
+                batch_media_tabs = gr.Tabs()
+                with batch_media_tabs:
+                    # BATCH IMAGES TAB
+                    batch_images_tab = gr.TabItem("📚 Batch Images")
+                    with batch_images_tab:
                         with gr.Row():
-                            batch_preset = gr.Dropdown(
-                                choices=list(load_prompt_presets().keys()),
-                                value="None",
-                                label=get_text("prompt_preset"),
-                                info=get_text("prompt_preset_info"),
-                                scale=4
-                            )
-                            batch_refresh_presets = gr.Button(
-                                get_text("refresh_presets"),
-                                size="sm",
-                                scale=1
-                            )
+                            with gr.Column(scale=1, elem_classes="card-style"):
+                                gr.Markdown("### 📁 Input Files")
+                                batch_images = gr.File(
+                                    file_count="multiple",
+                                    label=get_text("upload_images"),
+                                    file_types=["image"]
+                                )
 
-                        batch_desc_type = gr.Dropdown(
-                            choices=get_description_types(),
-                            value=get_description_types()[0],
-                            label=get_text("description_type"),
-                            info=get_text("description_type_info")
-                        )
-                        batch_desc_length = gr.Dropdown(
-                            choices=get_description_lengths(),
-                            value=get_description_lengths()[0],
-                            label=get_text("description_length"),
-                            info=get_text("description_length_info")
-                        )
-                        batch_num_variants = gr.Slider(
-                            minimum=1,
-                            maximum=3,
-                            value=1,
-                            step=1,
-                            label=get_text("num_variants"),
-                            info=get_text("num_variants_info")
-                        )
+                                gr.Markdown("### 📝 Description Settings")
 
-                        # Character name field
-                        batch_character_name = gr.Textbox(
-                            label=get_text("character_name"),
-                            placeholder=get_text("character_name_placeholder"),
-                            info=get_text("character_name_info"),
-                            lines=1
-                        )
+                                # Prompt preset dropdown
+                                with gr.Row():
+                                    batch_preset = gr.Dropdown(
+                                        choices=list(load_prompt_presets().keys()),
+                                        value="None",
+                                        label=get_text("prompt_preset"),
+                                        info=get_text("prompt_preset_info"),
+                                        scale=4
+                                    )
+                                    batch_refresh_presets = gr.Button(
+                                        get_text("refresh_presets"),
+                                        size="sm",
+                                        scale=1
+                                    )
 
-                        # Extra options
-                        with gr.Accordion(get_text("extra_options"), open=False):
-                            batch_extra_options = gr.CheckboxGroup(
-                                choices=get_extra_options(),
-                                value=[],
-                                label="",
-                                info=get_text("extra_options_info")
-                            )
+                                batch_desc_type = gr.Dropdown(
+                                    choices=get_description_types(),
+                                    value=get_description_types()[0],
+                                    label=get_text("description_type"),
+                                    info=get_text("description_type_info")
+                                )
+                                batch_desc_length = gr.Dropdown(
+                                    choices=get_description_lengths(),
+                                    value=get_description_lengths()[0],
+                                    label=get_text("description_length"),
+                                    info=get_text("description_length_info")
+                                )
+                                batch_num_variants = gr.Slider(
+                                    minimum=1,
+                                    maximum=3,
+                                    value=1,
+                                    step=1,
+                                    label=get_text("num_variants"),
+                                    info=get_text("num_variants_info")
+                                )
 
-                        with gr.Accordion(get_text("custom_prompt_override"), open=False):
-                            batch_custom_prompt = gr.Textbox(
-                                placeholder=get_text("custom_prompt_placeholder"),
-                                lines=3,
-                                label=""
-                            )
+                                # Character name field
+                                batch_character_name = gr.Textbox(
+                                    label=get_text("character_name"),
+                                    placeholder=get_text("character_name_placeholder"),
+                                    info=get_text("character_name_info"),
+                                    lines=1
+                                )
 
-                        gr.Markdown("### 💾 Export Settings")
-                        batch_output_folder = gr.Textbox(
-                            label=get_text("output_folder"),
-                            placeholder=get_text("output_folder_placeholder"),
-                            value=""
-                        )
-                        batch_export_formats = gr.CheckboxGroup(
-                            choices=["TXT", "JSON", "CSV"],
-                            value=["TXT"],
-                            label=get_text("export_format")
-                        )
+                                # Extra options for images
+                                with gr.Accordion(get_text("extra_options"), open=False):
+                                    batch_extra_options = gr.CheckboxGroup(
+                                        choices=get_extra_options(is_video=False),
+                                        value=[],
+                                        label="",
+                                        info=get_text("extra_options_info")
+                                    )
 
+                                with gr.Accordion(get_text("custom_prompt_override"), open=False):
+                                    batch_custom_prompt = gr.Textbox(
+                                        placeholder=get_text("custom_prompt_placeholder"),
+                                        lines=3,
+                                        label=""
+                                    )
+
+                                gr.Markdown("### 💾 Export Settings")
+                                batch_output_folder = gr.Textbox(
+                                    label=get_text("output_folder"),
+                                    placeholder=get_text("output_folder_placeholder"),
+                                    value=""
+                                )
+                                batch_export_formats = gr.CheckboxGroup(
+                                    choices=["TXT", "JSON", "CSV"],
+                                    value=["TXT"],
+                                    label=get_text("export_format")
+                                )
+
+                                with gr.Row():
+                                    batch_submit_btn = gr.Button(
+                                        get_text("process_batch_btn"),
+                                        variant="primary",
+                                        elem_classes="generate-btn",
+                                        scale=3
+                                    )
+                                    batch_stop_btn = gr.Button(
+                                        get_text("stop_btn"),
+                                        variant="stop",
+                                        scale=1
+                                    )
+
+                            with gr.Column(scale=1, elem_classes="card-style"):
+                                gr.Markdown("### 📊 Results")
+                                batch_status = gr.Textbox(
+                                    label=get_text("status"),
+                                    interactive=False,
+                                    elem_classes="status-box"
+                                )
+                                batch_output = gr.Textbox(
+                                    label=get_text("results"),
+                                    lines=20,
+                                    show_copy_button=True
+                                )
+
+                                # Download result file
+                                batch_download = gr.File(
+                                    label=get_text("download_result"),
+                                    visible=True
+                                )
+
+                    # BATCH VIDEOS TAB
+                    batch_videos_tab = gr.TabItem("🎬 Batch Videos")
+                    with batch_videos_tab:
                         with gr.Row():
-                            batch_submit_btn = gr.Button(
-                                get_text("process_batch_btn"),
-                                variant="primary",
-                                elem_classes="generate-btn",
-                                scale=3
-                            )
-                            batch_stop_btn = gr.Button(
-                                get_text("stop_btn"),
-                                variant="stop",
-                                scale=1
-                            )
+                            with gr.Column(scale=1, elem_classes="card-style"):
+                                gr.Markdown("### 📁 Input Video Files")
+                                batch_videos = gr.File(
+                                    file_count="multiple",
+                                    label="Upload Videos",
+                                    file_types=["video"]
+                                )
 
-                    with gr.Column(scale=1, elem_classes="card-style"):
-                        gr.Markdown("### 📊 Results")
-                        batch_status = gr.Textbox(
-                            label=get_text("status"),
-                            interactive=False,
-                            elem_classes="status-box"
-                        )
-                        batch_output = gr.Textbox(
-                            label=get_text("results"),
-                            lines=20,
-                            show_copy_button=True
-                        )
+                                gr.Markdown("### 📝 Description Settings")
 
-                        # Download result file
-                        batch_download = gr.File(
-                            label=get_text("download_result"),
-                            visible=True
-                        )
+                                # Prompt preset dropdown
+                                with gr.Row():
+                                    batch_video_preset = gr.Dropdown(
+                                        choices=list(load_prompt_presets().keys()),
+                                        value="None",
+                                        label=get_text("prompt_preset"),
+                                        info=get_text("prompt_preset_info"),
+                                        scale=4
+                                    )
+                                    batch_video_refresh_presets = gr.Button(
+                                        get_text("refresh_presets"),
+                                        size="sm",
+                                        scale=1
+                                    )
+
+                                batch_video_desc_type = gr.Dropdown(
+                                    choices=get_description_types(),
+                                    value=get_description_types()[0],
+                                    label=get_text("description_type"),
+                                    info=get_text("description_type_info")
+                                )
+                                batch_video_desc_length = gr.Dropdown(
+                                    choices=get_description_lengths(),
+                                    value=get_description_lengths()[0],
+                                    label=get_text("description_length"),
+                                    info=get_text("description_length_info")
+                                )
+                                batch_video_num_variants = gr.Slider(
+                                    minimum=1,
+                                    maximum=3,
+                                    value=1,
+                                    step=1,
+                                    label=get_text("num_variants"),
+                                    info=get_text("num_variants_info")
+                                )
+
+                                # Character name field
+                                batch_video_character_name = gr.Textbox(
+                                    label=get_text("character_name"),
+                                    placeholder=get_text("character_name_placeholder"),
+                                    info=get_text("character_name_info"),
+                                    lines=1
+                                )
+
+                                # Extra options for videos
+                                with gr.Accordion(get_text("extra_options"), open=False):
+                                    batch_video_extra_options = gr.CheckboxGroup(
+                                        choices=get_extra_options(is_video=True),
+                                        value=[],
+                                        label="",
+                                        info=get_text("extra_options_info")
+                                    )
+
+                                with gr.Accordion(get_text("custom_prompt_override"), open=False):
+                                    batch_video_custom_prompt = gr.Textbox(
+                                        placeholder=get_text("custom_prompt_placeholder"),
+                                        lines=3,
+                                        label=""
+                                    )
+
+                                gr.Markdown("### 💾 Export Settings")
+                                batch_video_output_folder = gr.Textbox(
+                                    label=get_text("output_folder"),
+                                    placeholder=get_text("output_folder_placeholder"),
+                                    value=""
+                                )
+                                batch_video_export_formats = gr.CheckboxGroup(
+                                    choices=["TXT", "JSON", "CSV"],
+                                    value=["TXT"],
+                                    label=get_text("export_format")
+                                )
+
+                                with gr.Row():
+                                    batch_video_submit_btn = gr.Button(
+                                        "🚀 Process Batch Videos",
+                                        variant="primary",
+                                        elem_classes="generate-btn",
+                                        scale=3
+                                    )
+                                    batch_video_stop_btn = gr.Button(
+                                        get_text("stop_btn"),
+                                        variant="stop",
+                                        scale=1
+                                    )
+
+                            with gr.Column(scale=1, elem_classes="card-style"):
+                                gr.Markdown("### 📊 Results")
+                                batch_video_status = gr.Textbox(
+                                    label=get_text("status"),
+                                    interactive=False,
+                                    elem_classes="status-box"
+                                )
+                                batch_video_output = gr.Textbox(
+                                    label=get_text("results"),
+                                    lines=20,
+                                    show_copy_button=True
+                                )
+
+                                # Download result file
+                                batch_video_download = gr.File(
+                                    label=get_text("download_result"),
+                                    visible=True
+                                )
         
         # Обработчики событий
+
+        # Function to update extra options based on media type
+        def update_extra_options_for_media(is_video):
+            return gr.update(choices=get_extra_options(is_video=is_video), value=[])
+
+        # Media tab selection handlers - update extra options when switching tabs
+        def on_image_tab_select():
+            return gr.update(choices=get_extra_options(is_video=False), value=[]), False
+
+        def on_video_tab_select():
+            return gr.update(choices=get_extra_options(is_video=True), value=[]), True
+
+        # Connect media tab selection to extra options update
+        image_tab.select(fn=on_image_tab_select, outputs=[single_extra_options, single_is_video])
+        video_tab.select(fn=on_video_tab_select, outputs=[single_extra_options, single_is_video])
+
         def change_language(lang):
             global current_language
             current_language = lang
@@ -1626,15 +1962,19 @@ def create_interface():
                 gr.update(label=get_text("language"), info=get_text("language_info")),  # language_dropdown
                 gr.update(label=get_text("advanced_params")),  # advanced_accordion
                 gr.update(value=get_text("generate_btn")),  # single_submit_btn
+                gr.update(value=get_text("generate_btn")),  # single_submit_btn_top
+                gr.update(value=get_text("generate_btn")),  # single_submit_btn_top_video
                 gr.update(value=get_text("process_batch_btn")),  # batch_submit_btn
                 gr.update(choices=get_description_types(), value=get_description_types()[0]),  # single_desc_type
                 gr.update(choices=get_description_lengths(), value=get_description_lengths()[0]),  # single_desc_length
                 gr.update(choices=get_description_types(), value=get_description_types()[0]),  # batch_desc_type
                 gr.update(choices=get_description_lengths(), value=get_description_lengths()[0]),  # batch_desc_length
-                gr.update(choices=get_extra_options(), value=[]),  # single_extra_options
-                gr.update(choices=get_extra_options(), value=[]),  # batch_extra_options
+                gr.update(choices=get_extra_options(is_video=False), value=[]),  # single_extra_options
+                gr.update(choices=get_extra_options(is_video=False), value=[]),  # batch_extra_options
+                gr.update(choices=get_extra_options(is_video=True), value=[]),  # batch_video_extra_options
                 gr.update(value=get_text("stop_btn")),  # single_stop_btn
                 gr.update(value=get_text("stop_btn")),  # batch_stop_btn
+                gr.update(value=get_text("stop_btn")),  # batch_video_stop_btn
             ]
 
         language_dropdown.change(
@@ -1647,6 +1987,8 @@ def create_interface():
                 language_dropdown,
                 advanced_accordion,
                 single_submit_btn,
+                single_submit_btn_top,
+                single_submit_btn_top_video,
                 batch_submit_btn,
                 single_desc_type,
                 single_desc_length,
@@ -1654,8 +1996,10 @@ def create_interface():
                 batch_desc_length,
                 single_extra_options,
                 batch_extra_options,
+                batch_video_extra_options,
                 single_stop_btn,
                 batch_stop_btn,
+                batch_video_stop_btn,
             ]
         )
 
@@ -1668,6 +2012,11 @@ def create_interface():
         batch_stop_btn.click(
             fn=stop_generation,
             outputs=batch_status
+        )
+
+        batch_video_stop_btn.click(
+            fn=stop_generation,
+            outputs=batch_video_status
         )
 
         # Preset refresh handlers
@@ -1683,6 +2032,11 @@ def create_interface():
         batch_refresh_presets.click(
             fn=refresh_presets,
             outputs=batch_preset
+        )
+
+        batch_video_refresh_presets.click(
+            fn=refresh_presets,
+            outputs=batch_video_preset
         )
 
         # Preset selection handlers (load preset text into custom prompt)
@@ -1702,6 +2056,12 @@ def create_interface():
             fn=load_preset,
             inputs=batch_preset,
             outputs=batch_custom_prompt
+        )
+
+        batch_video_preset.change(
+            fn=load_preset,
+            inputs=batch_video_preset,
+            outputs=batch_video_custom_prompt
         )
 
         random_seed_btn.click(
@@ -1759,6 +2119,53 @@ def create_interface():
             yield gr.update(value=get_text("generate_btn"), interactive=True), status, prompt_used, *final_outputs, download_path
 
         single_submit_btn.click(
+            fn=process_single_wrapper,
+            inputs=[
+                single_image,
+                single_video,
+                single_image_url,
+                single_desc_type,
+                single_desc_length,
+                single_custom_prompt,
+                single_extra_options,
+                single_character_name,
+                single_num_variants,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+
+        # Duplicate button handlers - connect to same wrapper function
+        single_submit_btn_top.click(
+            fn=process_single_wrapper,
+            inputs=[
+                single_image,
+                single_video,
+                single_image_url,
+                single_desc_type,
+                single_desc_length,
+                single_custom_prompt,
+                single_extra_options,
+                single_character_name,
+                single_num_variants,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+
+        single_submit_btn_top_video.click(
             fn=process_single_wrapper,
             inputs=[
                 single_image,
@@ -1859,6 +2266,52 @@ def create_interface():
                 seed_number
             ],
             outputs=[batch_submit_btn, batch_status, batch_output, batch_download]
+        )
+
+        # Batch video processing with is_video=True
+        def process_batch_video_wrapper(files, desc_type, desc_length, custom_prompt,
+                                        extra_options, character_name, num_variants,
+                                        output_folder, export_formats, model_name, quantization,
+                                        max_tokens, temperature, top_p, top_k, seed):
+            # Disable button at start
+            yield gr.update(value="⏳ Processing...", interactive=False), "", "", None
+
+            download_path = None
+
+            # Process and yield results with is_video=True
+            for status, output_text, download_path in process_batch_images(
+                files, desc_type, desc_length, custom_prompt,
+                extra_options, character_name, num_variants,
+                output_folder, export_formats, model_name, quantization,
+                max_tokens, temperature, top_p, top_k, seed,
+                is_video=True  # KEY DIFFERENCE: process as videos
+            ):
+                yield gr.update(value="⏳ Processing...", interactive=False), status, output_text, download_path
+
+            # Re-enable button at end
+            yield gr.update(value="🚀 Process Batch Videos", interactive=True), status, output_text, download_path
+
+        batch_video_submit_btn.click(
+            fn=process_batch_video_wrapper,
+            inputs=[
+                batch_videos,
+                batch_video_desc_type,
+                batch_video_desc_length,
+                batch_video_custom_prompt,
+                batch_video_extra_options,
+                batch_video_character_name,
+                batch_video_num_variants,
+                batch_video_output_folder,
+                batch_video_export_formats,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[batch_video_submit_btn, batch_video_status, batch_video_output, batch_video_download]
         )
 
         return demo
