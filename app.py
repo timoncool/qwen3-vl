@@ -27,13 +27,6 @@ except ImportError:
     PSUTIL_AVAILABLE = False
     print("Note: psutil not installed. RAM monitoring will be limited.")
 
-# Optional: cv2 for video duration
-try:
-    import cv2
-    CV2_AVAILABLE = True
-except ImportError:
-    CV2_AVAILABLE = False
-    print("Note: opencv-python not installed. Video duration detection will be limited.")
 
 # Suppress meta device warning (not useful)
 warnings.filterwarnings('ignore', message='.*meta device.*')
@@ -293,22 +286,26 @@ def get_memory_info() -> str:
     return " | ".join(info_parts) if info_parts else "Memory info unavailable"
 
 def get_video_duration(video_path: str) -> float:
-    """Get video duration in seconds"""
+    """Get video duration in seconds using ffprobe (lightweight, no extra dependencies)"""
     if not video_path or not os.path.exists(video_path):
         return 7200.0  # Default 2 hours
 
-    if CV2_AVAILABLE:
-        try:
-            cap = cv2.VideoCapture(video_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-            cap.release()
-            if fps > 0 and frame_count > 0:
-                return frame_count / fps
-        except:
-            pass
+    # Use ffprobe - fast, lightweight, no loading video into memory
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', video_path],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            duration = float(result.stdout.strip())
+            if duration > 0:
+                return duration
+    except:
+        pass
 
-    # Fallback to default
+    # Fallback to 2 hours if ffprobe not available
     return 7200.0
 
 def load_prompt_presets() -> dict:
