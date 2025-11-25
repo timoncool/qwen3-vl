@@ -1719,7 +1719,7 @@ def create_interface():
         )
 
         # Single image processing with button lock
-        def process_single_wrapper(image, image_url, desc_type, desc_length, custom_prompt,
+        def process_single_wrapper(image, video, image_url, desc_type, desc_length, custom_prompt,
                                    extra_options, character_name, num_variants,
                                    model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
             # Disable button at start
@@ -1730,7 +1730,7 @@ def create_interface():
 
             # Process and yield results
             for status, prompt_used, results, download_path in process_single_image(
-                image, image_url, desc_type, desc_length, custom_prompt,
+                image, video, image_url, desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed
             ):
