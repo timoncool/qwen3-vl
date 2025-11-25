@@ -959,6 +959,7 @@ def load_image_from_url(url: str) -> Optional[str]:
 
 def process_single_image(
     image,
+    video,
     image_url: str,
     description_type: str,
     description_length: str,
@@ -975,13 +976,13 @@ def process_single_image(
     seed: int,
     progress=gr.Progress(track_tqdm=True)
 ) -> Generator:
-    """Обработка одного изображения с генерацией нескольких вариантов"""
+    """Обработка одного изображения/видео с генерацией нескольких вариантов"""
     global stop_generation_flag
     reset_stop_flag()
     start_time = time.time()
 
-    # Check if we have either uploaded image or URL
-    if image is None and not image_url.strip():
+    # Check if we have either uploaded image/video or URL
+    if image is None and video is None and not image_url.strip():
         yield get_text("error_no_image"), "", [], None
         return
 
@@ -999,11 +1000,14 @@ def process_single_image(
     num_variants = int(num_variants) if num_variants and str(num_variants).strip() else 1
 
     try:
-        # Priority: URL over uploaded image (if both provided, URL takes precedence)
+        # Priority: URL > video > image
         if image_url and image_url.strip():
             yield f"⏳ {get_text('generating')} (loading from URL...)", final_prompt, [], None
             image_path = load_image_from_url(image_url.strip())
             temp_path = image_path
+        elif video is not None:
+            # Video uploaded - use it directly
+            image_path = video
         elif hasattr(image, 'shape'):
             # Сохраняем временное изображение если это numpy array
             temp_path = os.path.join(TEMP_DIR, "temp_image.jpg")
