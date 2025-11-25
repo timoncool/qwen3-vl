@@ -2466,6 +2466,8 @@ def create_interface():
             inputs=[
                 single_image,
                 single_video,
+                video_start_time,
+                video_end_time,
                 single_desc_type,
                 single_desc_length,
                 single_custom_prompt,
