@@ -1554,6 +1554,19 @@ def create_interface():
                                     label=get_text("upload_image"),
                                     height=300
                                 )
+                                # Duplicate Generate/Stop buttons for quick access
+                                with gr.Row():
+                                    single_generate_btn_image = gr.Button(
+                                        get_text("generate_btn"),
+                                        variant="primary",
+                                        elem_classes="generate-btn",
+                                        scale=3
+                                    )
+                                    single_stop_btn_image = gr.Button(
+                                        get_text("stop_btn"),
+                                        variant="stop",
+                                        scale=1
+                                    )
 
                             video_tab = gr.TabItem("🎥 Video")
                             with video_tab:
@@ -1561,6 +1574,19 @@ def create_interface():
                                     label="Upload Video",
                                     height=300
                                 )
+                                # Duplicate Generate/Stop buttons for quick access
+                                with gr.Row():
+                                    single_generate_btn_video = gr.Button(
+                                        get_text("generate_btn"),
+                                        variant="primary",
+                                        elem_classes="generate-btn",
+                                        scale=3
+                                    )
+                                    single_stop_btn_video = gr.Button(
+                                        get_text("stop_btn"),
+                                        variant="stop",
+                                        scale=1
+                                    )
 
                         gr.Markdown("### 📝 Description Settings")
 
@@ -1970,6 +1996,10 @@ def create_interface():
                 gr.update(value=get_text("stop_btn")),  # single_stop_btn
                 gr.update(value=get_text("stop_btn")),  # batch_stop_btn
                 gr.update(value=get_text("stop_btn")),  # batch_video_stop_btn
+                gr.update(value=get_text("generate_btn")),  # single_generate_btn_image
+                gr.update(value=get_text("stop_btn")),  # single_stop_btn_image
+                gr.update(value=get_text("generate_btn")),  # single_generate_btn_video
+                gr.update(value=get_text("stop_btn")),  # single_stop_btn_video
             ]
 
         language_dropdown.change(
@@ -1993,6 +2023,10 @@ def create_interface():
                 single_stop_btn,
                 batch_stop_btn,
                 batch_video_stop_btn,
+                single_generate_btn_image,
+                single_stop_btn_image,
+                single_generate_btn_video,
+                single_stop_btn_video,
             ]
         )
 
@@ -2131,6 +2165,62 @@ def create_interface():
                 seed_number
             ],
             outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+
+        # Duplicate Generate buttons in Image/Video tabs - same functionality
+        single_generate_btn_image.click(
+            fn=process_single_wrapper,
+            inputs=[
+                single_image,
+                single_video,
+                single_desc_type,
+                single_desc_length,
+                single_custom_prompt,
+                single_extra_options,
+                single_character_name,
+                single_num_variants,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+
+        single_generate_btn_video.click(
+            fn=process_single_wrapper,
+            inputs=[
+                single_image,
+                single_video,
+                single_desc_type,
+                single_desc_length,
+                single_custom_prompt,
+                single_extra_options,
+                single_character_name,
+                single_num_variants,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download]
+        )
+
+        # Duplicate Stop buttons in Image/Video tabs
+        single_stop_btn_image.click(
+            fn=stop_generation,
+            outputs=single_status
+        )
+
+        single_stop_btn_video.click(
+            fn=stop_generation,
+            outputs=single_status
         )
 
         # Save preset handler
