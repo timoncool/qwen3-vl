@@ -1866,7 +1866,7 @@ if __name__ == "__main__":
     # Enable queue for progress bar support
     demo.queue(max_size=20, default_concurrency_limit=1).launch(
         server_name="127.0.0.1",
-        server_port=7860,
+        server_port=None,
         share=False,
         show_error=True,
         inbrowser=True
