@@ -189,11 +189,7 @@ EXTRA_OPTIONS = {
         "Include composition style": "Include information on the image's composition style, such as leading lines, rule of thirds, or symmetry.",
         "Don't mention text in image": "Do NOT mention any text that is in the image.",
         "Include depth of field": "Specify the depth of field and whether the background is in focus or blurred.",
-        "Describe only key elements": "ONLY describe the most important elements of the image.",
-        "OCR: Extract all text": "Extract ALL text from the image. Read every word, number, and symbol visible.",
-        "OCR: Text with coordinates": "Extract all text and provide position coordinates [x1, y1, x2, y2] for each text region.",
-        "OCR: Table to HTML": "If there is a table, convert it to HTML format using <table>, <tr>, and <td> tags.",
-        "OCR: Structured JSON": "Extract all information in structured JSON format with key-value pairs."
+        "Describe only key elements": "ONLY describe the most important elements of the image."
     },
     "ru": {
         "Добавить информацию об освещении": "Добавь информацию об освещении.",
@@ -207,11 +203,7 @@ EXTRA_OPTIONS = {
         "Добавить стиль композиции": "Добавь информацию о стиле композиции (ведущие линии, правило третей, симметрия).",
         "Не упоминать текст на изображении": "НЕ упоминай текст, который есть на изображении.",
         "Добавить глубину резкости": "Укажи глубину резкости и размытость фона.",
-        "Описывать только ключевые элементы": "Описывай ТОЛЬКО самые важные элементы изображения.",
-        "OCR: Извлечь весь текст": "Извлеки ВЕСЬ текст с изображения. Прочитай каждое слово, цифру и символ.",
-        "OCR: Текст с координатами": "Извлеки весь текст и укажи координаты позиции [x1, y1, x2, y2] для каждой текстовой области.",
-        "OCR: Таблица в HTML": "Если есть таблица, преобразуй её в HTML формат с тегами <table>, <tr> и <td>.",
-        "OCR: Структурированный JSON": "Извлеки всю информацию в структурированном JSON формате с ключами и значениями."
+        "Описывать только ключевые элементы": "Описывай ТОЛЬКО самые важные элементы изображения."
     },
     "zh": {
         "包含光照信息": "包含光照信息。",
@@ -225,11 +217,7 @@ EXTRA_OPTIONS = {
         "包含构图风格": "包含构图风格信息，如引导线、三分法则或对称性。",
         "不要提及图片中的文字": "不要提及图片中的任何文字。",
         "包含景深信息": "说明景深以及背景是否模糊。",
-        "只描述关键元素": "只描述图片中最重要的元素。",
-        "OCR: 提取所有文字": "提取图片中的所有文字。读取每个单词、数字和符号。",
-        "OCR: 文字与坐标": "提取所有文字并提供每个文字区域的位置坐标[x1, y1, x2, y2]。",
-        "OCR: 表格转HTML": "如果有表格，将其转换为HTML格式，使用<table>、<tr>和<td>标签。",
-        "OCR: 结构化JSON": "以结构化JSON格式提取所有信息，包含键值对。"
+        "只描述关键元素": "只描述图片中最重要的元素。"
     }
 }
 
@@ -489,6 +477,10 @@ DESCRIPTION_TYPES = {
         "Booru Tags": "Write a list of Booru-style tags for this image, separated by commas.",
         "Art Critic Analysis": "Analyze this image like an art critic, discussing composition, style, color, lighting, and artistic elements.",
         "Social Media Caption": "Write an engaging social media caption for this image.",
+        "OCR: Extract all text": "Extract ALL text from the image. Read every word, number, and symbol visible.",
+        "OCR: Text with coordinates": "Extract all text and provide position coordinates [x1, y1, x2, y2] for each text region.",
+        "OCR: Table to HTML": "If there is a table, convert it to HTML format using <table>, <tr>, and <td> tags.",
+        "OCR: Structured JSON": "Extract all information in structured JSON format with key-value pairs.",
         "Custom": ""
     },
     "ru": {
@@ -501,6 +493,10 @@ DESCRIPTION_TYPES = {
         "Теги Booru": "Напиши список тегов в стиле Booru для этого изображения, разделённых запятыми.",
         "Анализ искусствоведа": "Проанализируй это изображение как искусствовед, обсуждая композицию, стиль, цвет, освещение и художественные элементы на русском языке.",
         "Пост для соцсетей": "Напиши привлекательную подпись для социальных сетей к этому изображению на русском языке.",
+        "OCR: Извлечь весь текст": "Извлеки ВЕСЬ текст с изображения. Прочитай каждое слово, цифру и символ.",
+        "OCR: Текст с координатами": "Извлеки весь текст и укажи координаты позиции [x1, y1, x2, y2] для каждой текстовой области.",
+        "OCR: Таблица в HTML": "Если есть таблица, преобразуй её в HTML формат с тегами <table>, <tr> и <td>.",
+        "OCR: Структурированный JSON": "Извлеки всю информацию в структурированном JSON формате с ключами и значениями.",
         "Свой промпт": ""
     },
     "zh": {
@@ -513,6 +509,10 @@ DESCRIPTION_TYPES = {
         "Booru标签": "为这张图片写一个Booru风格的标签列表，用逗号分隔。",
         "艺术评论分析": "像艺术评论家一样分析这张图片，讨论构图、风格、色彩、光线和艺术元素。",
         "社交媒体文案": "为这张图片写一个吸引人的社交媒体文案。",
+        "OCR: 提取所有文字": "提取图片中的所有文字。读取每个单词、数字和符号。",
+        "OCR: 文字与坐标": "提取所有文字并提供每个文字区域的位置坐标[x1, y1, x2, y2]。",
+        "OCR: 表格转HTML": "如果有表格，将其转换为HTML格式，使用<table>、<tr>和<td>标签。",
+        "OCR: 结构化JSON": "以结构化JSON格式提取所有信息，包含键值对。",
         "自定义": ""
     }
 }
