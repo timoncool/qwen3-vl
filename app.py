@@ -1014,10 +1014,22 @@ class ImageDescriptionGenerator:
         if (self.current_model_name == model_name and
             self.current_quantization == quantization and
             self.model is not None):
+            print(f"✅ Модель {model_name} уже загружена")
             return
 
-        print(get_text("loading_model").format(model_name))
-        print(f"Quantization: {quantization}")
+        print(f"\n{'='*50}")
+        print(f"🧠 Загрузка модели: {model_name}")
+        print(f"⚙️ Квантизация: {quantization}")
+        print(f"💻 Устройство: {self.device}")
+        print(f"{'='*50}")
+
+        # Проверяем, скачана ли модель
+        cached_size = get_model_cache_size(model_name)
+        if cached_size:
+            print(f"✅ Модель найдена в кэше [{cached_size}]")
+        else:
+            print(f"⬇️ Модель не найдена в кэше - будет скачана с HuggingFace...")
+            print(f"⏳ Это может занять несколько минут при первом запуске")
 
         # Сохраняем старую модель на случай ошибки
         old_model = self.model
@@ -1028,6 +1040,7 @@ class ImageDescriptionGenerator:
         try:
             # Освобождаем память от предыдущей модели
             if self.model is not None:
+                print(f"🗑️ Выгружаем предыдущую модель: {old_model_name}")
                 self.model = None
                 self.processor = None
                 del old_model
@@ -1036,6 +1049,7 @@ class ImageDescriptionGenerator:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     torch.cuda.synchronize()
+                print(f"✅ Память очищена")
 
             # Настройка квантизации BitsAndBytes
             bnb_config = None
@@ -1048,16 +1062,19 @@ class ImageDescriptionGenerator:
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_use_double_quant=True,
                 )
-                print("Using 4-bit quantization (NF4 + double quant) - ~75% VRAM reduction")
+                print("⚡ 4-bit квантизация (NF4) — экономия ~75% VRAM")
             elif quantization == "8-bit" and torch.cuda.is_available():
                 bnb_config = BitsAndBytesConfig(
                     load_in_8bit=True,
                 )
-                print("Using 8-bit quantization - ~50% VRAM reduction")
+                print("⚡ 8-bit квантизация — экономия ~50% VRAM")
             else:
-                print("Using full precision (bfloat16/float32)")
+                print("📊 Полная точность (bfloat16/float32)")
 
             # Загружаем новую модель с подавлением предупреждений
+            print(f"🔄 Загрузка модели...")
+            load_start_time = time.time()
+
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore')
                 load_kwargs = {
@@ -1074,20 +1091,29 @@ class ImageDescriptionGenerator:
                 # Быстрый и работает на Windows без доп. зависимостей
                 if torch.cuda.is_available():
                     load_kwargs["attn_implementation"] = "sdpa"
-                    print("Using SDPA attention (PyTorch native, fast)")
+                    print("🚀 SDPA attention (PyTorch native)")
 
                 self.model = Qwen3VLForConditionalGeneration.from_pretrained(
                     model_name,
                     **load_kwargs
                 )
+                print(f"🔄 Загрузка процессора...")
                 self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
 
+            load_time = time.time() - load_start_time
             self.current_model_name = model_name
             self.current_quantization = quantization
-            print(get_text("model_loaded").format(model_name, self.device))
+
+            # Показываем информацию о памяти
+            memory_info = get_memory_info()
+            print(f"\n{'='*50}")
+            print(f"✅ Модель загружена за {load_time:.1f} сек")
+            print(f"📊 {memory_info}")
+            print(f"{'='*50}\n")
 
         except Exception as e:
             # При ошибке загрузки - очищаем состояние
+            print(f"❌ Ошибка загрузки модели: {str(e)}")
             self.model = None
             self.processor = None
             self.current_model_name = None
@@ -1651,7 +1677,13 @@ def create_interface():
                 info=get_text("language_info"),
                 scale=1
             )
-        
+
+        # Индикатор текущей загруженной модели
+        current_model_indicator = gr.Markdown(
+            value="📭 **Модель не загружена** — будет загружена при первой генерации",
+            elem_id="model_indicator"
+        )
+
         # Расширенные параметры
         advanced_accordion = gr.Accordion(get_text("advanced_params"), open=False)
         with advanced_accordion:
@@ -2307,8 +2339,11 @@ def create_interface():
             log_capture.clear_logs()
             log_capture.start_capture()
 
+            # Model indicator - loading
+            model_indicator = f"⏳ **Загрузка модели** {model_name}..."
+
             # Disable button at start
-            yield gr.update(value=get_text("generating"), interactive=False), "", "", *[gr.update(value="") for _ in range(5)], None, ""
+            yield gr.update(value=get_text("generating"), interactive=False), "", "", *[gr.update(value="") for _ in range(5)], None, "", model_indicator
 
             results = []
             download_path = None
@@ -2327,9 +2362,14 @@ def create_interface():
                     else:
                         variant_outputs.append(gr.update(value=""))
 
+                # Update model indicator
+                cached_size = get_model_cache_size(model_name)
+                size_str = f" [{cached_size}]" if cached_size else ""
+                model_indicator = f"✅ **{model_name}**{size_str} | {quantization}"
+
                 # Get current console logs
                 console_logs = log_capture.get_logs()
-                yield gr.update(value=get_text("generating"), interactive=False), status, prompt_used, *variant_outputs, download_path, console_logs
+                yield gr.update(value=get_text("generating"), interactive=False), status, prompt_used, *variant_outputs, download_path, console_logs, model_indicator
 
             # Stop capturing and get final logs
             log_capture.stop_capture()
@@ -2343,7 +2383,12 @@ def create_interface():
                 else:
                     final_outputs.append(gr.update(value=""))
 
-            yield gr.update(value=get_text("generate_btn"), interactive=True), status, prompt_used, *final_outputs, download_path, final_logs
+            # Final model indicator
+            cached_size = get_model_cache_size(model_name)
+            size_str = f" [{cached_size}]" if cached_size else ""
+            final_model_indicator = f"✅ **{model_name}**{size_str} | {quantization}"
+
+            yield gr.update(value=get_text("generate_btn"), interactive=True), status, prompt_used, *final_outputs, download_path, final_logs, final_model_indicator
 
         single_submit_btn.click(
             fn=process_single_wrapper,
@@ -2364,7 +2409,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output, current_model_indicator]
         )
 
         # Duplicate Generate buttons in Image/Video tabs - same functionality
@@ -2387,7 +2432,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output, current_model_indicator]
         )
 
         single_generate_btn_video.click(
@@ -2409,7 +2454,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output, current_model_indicator]
         )
 
         # Duplicate Stop buttons in Image/Video tabs
