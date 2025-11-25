@@ -2397,7 +2397,7 @@ def create_interface():
             download_path = None
 
             # Process and yield results
-            for status, prompt_used, results, download_path in process_single_image(
+            for status, prompt_used, results, download_path, _ in process_single_image(
                 image, video, desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed
