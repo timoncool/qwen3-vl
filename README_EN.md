@@ -11,11 +11,20 @@ Portable application with web interface for working with Qwen3-VL multimodal mod
 
 ---
 
-## ⭐ Support the Project!
+## About Qwen3-VL Model
 
-If you like SuperCaption, **give it a star on GitHub**! It helps the project grow and shows that it's useful to the community.
+**Qwen3-VL** is a multimodal model from Alibaba Cloud capable of understanding images and videos. The model analyzes visual content and generates text descriptions.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
+**Important:** Qwen3-VL works only with visual information (images, video frames). The model **does not understand audio** — it cannot analyze music, speech, or sound effects.
+
+Key model capabilities:
+- Understanding images of any resolution
+- Video analysis (frame-by-frame)
+- OCR in 20+ languages
+- Object Detection with coordinates
+- Reasoning mode (Thinking) for complex tasks
+
+Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
 
 ---
 
@@ -232,48 +241,6 @@ Application will start at `http://localhost:7860`
 
 ---
 
-## Additional Description Options
-
-### For Images
-
-| Option | What It Adds |
-|--------|--------------|
-| Lighting Information | Light source description and effects |
-| Camera Angle | Shooting angle and perspective |
-| Watermark | Presence/absence of watermarks |
-| JPEG Artifacts | Image compression quality |
-| Camera/Photo Details | Aperture, shutter speed, ISO (if applicable) |
-| SFW/PG Rating | Exclude adult content |
-| Aesthetic Quality | Subjective quality rating |
-| Composition Style | Rule of thirds, symmetry, leading lines |
-| Depth of Field | Focus and background blur |
-| Key Elements Only | Focus on the most important |
-
-### For Video
-
-| Option | What It Adds |
-|--------|--------------|
-| Camera Movement | Panning, zoom, static |
-| Audio Description | Music, speech, sound effects |
-| Plot/Story | Event development |
-| Timestamps | Time markers in HH:MM:SS format |
-| Editing Style | Transitions, pacing, effects |
-| Key Moments Only | Focus on important events |
-
----
-
-## Generation Parameters
-
-| Parameter | Description | Recommendations |
-|-----------|-------------|-----------------|
-| **Temperature** | Creativity | 0.1-0.3 for precise tasks, 0.7-1.0 for creative |
-| **Max tokens** | Response length | 256-512 for brief, 1024+ for detailed |
-| **Top-p** | Nucleus sampling | 0.9 for balance, 0.5 for focus |
-| **Top-k** | Token limit | 50 by default |
-| **Seed** | Reproducibility | Specific number for repeatability, -1 for random |
-
----
-
 ## Project Structure
 
 ```
@@ -334,8 +301,10 @@ qwen3-vl/
 
 ## Credits
 
+**Original model:** [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL) by Alibaba Cloud
+
 **Portable version:**
-- [Nerual Dreming](https://t.me/nerual_dreming)
+- [Nerual Dreming](https://t.me/nerual_dreming) — founder of [ArtGeneration.me](https://artgeneration.me/), tech blogger, and neuro-evangelist.
 - [Slait](https://t.me/ruweb24)
 
 **Telegram channel:** [NEURO-SOFT](https://t.me/neuroport)
@@ -348,10 +317,12 @@ Project uses [Qwen](https://github.com/QwenLM/Qwen2.5-VL) models under Apache 2.
 
 ---
 
-## ⭐ Don't Forget to Star!
+## ⭐ Support the Project!
 
 If SuperCaption helped you — give it a ⭐ on GitHub!
 
 It's free and takes a second, but really motivates project development.
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=for-the-badge&logo=github)](https://github.com/timoncool/qwen3-vl/stargazers)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)

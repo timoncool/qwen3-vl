@@ -11,11 +11,20 @@
 
 ---
 
-## ⭐ 支持项目！
+## 关于 Qwen3-VL 模型
 
-如果您喜欢 SuperCaption，**请在 GitHub 上给我们一个星标**！这有助于项目发展，并表明它对社区有用。
+**Qwen3-VL** 是阿里云推出的多模态模型，能够理解图像和视频。该模型分析视觉内容并生成文本描述。
 
-[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
+**重要提示：** Qwen3-VL 仅处理视觉信息（图像、视频帧）。该模型**不理解音频** — 无法分析音乐、语音或音效。
+
+模型核心能力：
+- 理解任意分辨率的图像
+- 视频分析（逐帧）
+- 支持 20+ 种语言的 OCR
+- 带坐标的目标检测
+- 复杂任务的推理模式（Thinking）
+
+了解更多：[Qwen2.5-VL GitHub](https://github.com/QwenLM/Qwen2.5-VL)
 
 ---
 
@@ -232,48 +241,6 @@ python app.py
 
 ---
 
-## 额外描述选项
-
-### 图像选项
-
-| 选项 | 添加内容 |
-|------|----------|
-| 光照信息 | 光源描述及其效果 |
-| 相机角度 | 拍摄角度和透视 |
-| 水印 | 是否有水印 |
-| JPEG 伪影 | 图像压缩质量 |
-| 相机/照片详情 | 光圈、快门速度、ISO（如适用） |
-| SFW/PG 级别 | 排除成人内容 |
-| 美学质量 | 主观质量评价 |
-| 构图风格 | 三分法则、对称、引导线 |
-| 景深 | 焦点和背景模糊 |
-| 仅关键元素 | 专注于最重要的 |
-
-### 视频选项
-
-| 选项 | 添加内容 |
-|------|----------|
-| 镜头运动 | 平移、缩放、静态 |
-| 音频描述 | 音乐、语音、音效 |
-| 情节/故事 | 事件发展 |
-| 时间戳 | HH:MM:SS 格式的时间标记 |
-| 剪辑风格 | 转场、节奏、效果 |
-| 仅关键时刻 | 专注于重要事件 |
-
----
-
-## 生成参数
-
-| 参数 | 描述 | 建议 |
-|------|------|------|
-| **温度** | 创造力 | 0.1-0.3 用于精确任务，0.7-1.0 用于创意 |
-| **最大令牌** | 响应长度 | 256-512 用于简短，1024+ 用于详细 |
-| **Top-p** | 核采样 | 0.9 用于平衡，0.5 用于聚焦 |
-| **Top-k** | 令牌限制 | 默认 50 |
-| **种子** | 可重复性 | 特定数字用于重复，-1 用于随机 |
-
----
-
 ## 项目结构
 
 ```
@@ -334,8 +301,10 @@ qwen3-vl/
 
 ## 致谢
 
+**原始模型：** [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL)，阿里云出品
+
 **便携版：**
-- [Nerual Dreming](https://t.me/nerual_dreming)
+- [Nerual Dreming](https://t.me/nerual_dreming) — founder of [ArtGeneration.me](https://artgeneration.me/), tech blogger, and neuro-evangelist.
 - [Slait](https://t.me/ruweb24)
 
 **Telegram 频道：** [NEURO-SOFT](https://t.me/neuroport)
@@ -348,10 +317,12 @@ qwen3-vl/
 
 ---
 
-## ⭐ 别忘了给星标！
+## ⭐ 支持项目！
 
 如果 SuperCaption 帮助了您 — 请在 GitHub 上给它一个 ⭐！
 
 这是免费的，只需一秒钟，但真的能激励项目发展。
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=for-the-badge&logo=github)](https://github.com/timoncool/qwen3-vl/stargazers)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
