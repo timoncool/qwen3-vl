@@ -51,20 +51,20 @@ if "%GPU_CHOICE%"=="2" (
 if "%GPU_CHOICE%"=="3" (
     set "CUDA_VERSION=cu126"
     set "CUDA_NAME=CUDA 12.6"
-    set "TORCH_VERSION=2.8.0"
-    set "TORCHVISION_VERSION=0.23.0"
+    set "TORCH_VERSION=2.7.1"
+    set "TORCHVISION_VERSION=0.22.1"
 )
 if "%GPU_CHOICE%"=="4" (
     set "CUDA_VERSION=cu128"
     set "CUDA_NAME=CUDA 12.8"
-    set "TORCH_VERSION=2.8.0"
-    set "TORCHVISION_VERSION=0.23.0"
+    set "TORCH_VERSION=2.7.1"
+    set "TORCHVISION_VERSION=0.22.1"
 )
 if "%GPU_CHOICE%"=="5" (
-    set "CUDA_VERSION=cu129"
-    set "CUDA_NAME=CUDA 12.9"
-    set "TORCH_VERSION=2.8.0"
-    set "TORCHVISION_VERSION=0.23.0"
+    set "CUDA_VERSION=cu128"
+    set "CUDA_NAME=CUDA 12.8 (совместимо с RTX 50xx)"
+    set "TORCH_VERSION=2.7.1"
+    set "TORCHVISION_VERSION=0.22.1"
 )
 if "%GPU_CHOICE%"=="6" (
     set "CUDA_VERSION=cpu"
@@ -146,10 +146,8 @@ echo.
 
 REM Устанавливаем flash-attn в зависимости от GPU
 if "%GPU_CHOICE%"=="3" (
-    echo Установка Flash Attention 2 для RTX 30xx ^(CUDA 12.6^)...
-    echo ⚠️ Для PyTorch 2.8.0 + CUDA 12.6 пока нет совместимого wheel.
-    echo    Используем CUDA 12.8 wheel ^(должен работать^)...
-    python\python.exe -m pip install https://huggingface.co/Wildminder/AI-windows-whl/resolve/main/flash_attn-2.7.4.post1+cu128torch2.8.0cxx11abiTRUE-cp312-cp312-win_amd64.whl --no-warn-script-location
+    echo Установка Flash Attention 2 для RTX 30xx ^(CUDA 12.6 + PyTorch 2.7.1^)...
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4+cu126torch2.6.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
@@ -158,8 +156,8 @@ if "%GPU_CHOICE%"=="3" (
     )
 )
 if "%GPU_CHOICE%"=="4" (
-    echo Установка Flash Attention 2 для RTX 40xx ^(CUDA 12.8 + PyTorch 2.8.0^)...
-    python\python.exe -m pip install https://huggingface.co/Wildminder/AI-windows-whl/resolve/main/flash_attn-2.7.4.post1+cu128torch2.8.0cxx11abiTRUE-cp312-cp312-win_amd64.whl --no-warn-script-location
+    echo Установка Flash Attention 2 для RTX 40xx ^(CUDA 12.8 + PyTorch 2.7.1^)...
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1+cu128torch2.7.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
@@ -168,8 +166,8 @@ if "%GPU_CHOICE%"=="4" (
     )
 )
 if "%GPU_CHOICE%"=="5" (
-    echo Установка Flash Attention 2 для RTX 50xx ^(CUDA 12.9 + PyTorch 2.8.0^)...
-    python\python.exe -m pip install https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/resolve/main/flash_attn-2.8.2+cu129torch2.8.0cxx11abiTRUE-cp312-cp312-win_amd64.whl --no-warn-script-location
+    echo Установка Flash Attention 2 для RTX 50xx ^(CUDA 12.8 + PyTorch 2.7.1^)...
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1+cu128torch2.7.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
