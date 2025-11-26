@@ -160,7 +160,7 @@ AVAILABLE_MODELS = [
     ("8B Thinking Abliterated", "huihui-ai/Huihui-Qwen3-VL-8B-Thinking-abliterated"),
     ("32B Instruct Abliterated", "huihui-ai/Huihui-Qwen3-VL-32B-Instruct-abliterated"),
     ("32B Thinking Abliterated", "huihui-ai/Huihui-Qwen3-VL-32B-Thinking-abliterated"),
-    # Original Qwen models
+    # Original Qwen models (с цензурой)
     ("Qwen 2B Instruct", "Qwen/Qwen3-VL-2B-Instruct"),
     ("Qwen 4B Instruct", "Qwen/Qwen3-VL-4B-Instruct"),
     ("Qwen 8B Instruct", "Qwen/Qwen3-VL-8B-Instruct"),
@@ -232,6 +232,7 @@ EXTRA_OPTIONS_VIDEO = {
         "Describe camera movement": "Describe camera movements (panning, zooming, static, etc.).",
         "Include audio description": "If the video has audio, describe it (music, speech, sound effects).",
         "Describe plot/story": "Describe the plot or story progression in the video.",
+        "Include timestamps": "Provide timestamps in HH:MM:SS format for key events (e.g., 'person started running at 00:01:23').",
         "Include lighting info": "Include information about lighting changes throughout the video.",
         "Include editing style": "Describe the editing style (cuts, transitions, effects).",
         "Keep it SFW/PG": "Do NOT include anything sexual; keep it PG.",
@@ -242,6 +243,7 @@ EXTRA_OPTIONS_VIDEO = {
         "Описать движение камеры": "Опиши движения камеры (панорамирование, зум, статичная и т.д.).",
         "Добавить описание звука": "Если в видео есть звук, опиши его (музыка, речь, звуковые эффекты).",
         "Описать сюжет/историю": "Опиши сюжет или развитие истории в видео.",
+        "Указать таймстампы": "Укажи таймстампы в формате ЧЧ:ММ:СС для ключевых событий (например, 'человек начал бежать в 00:01:23').",
         "Добавить информацию об освещении": "Добавь информацию об изменениях освещения в течение видео.",
         "Добавить стиль монтажа": "Опиши стиль монтажа (переходы, эффекты).",
         "Сохранить SFW/PG рейтинг": "НЕ включай сексуальный контент, сохраняй рейтинг PG.",
@@ -252,6 +254,7 @@ EXTRA_OPTIONS_VIDEO = {
         "描述镜头运动": "描述镜头运动（平移、缩放、静止等）。",
         "包含音频描述": "如果视频有音频，描述它（音乐、语音、音效）。",
         "描述情节/故事": "描述视频中的情节或故事发展。",
+        "包含时间戳": "以HH:MM:SS格式提供关键事件的时间戳（例如，'人物在00:01:23开始奔跑'）。",
         "包含光照信息": "包含视频中光照变化的信息。",
         "包含剪辑风格": "描述剪辑风格（切换、过渡、效果）。",
         "保持SFW/PG级别": "不要包含任何性相关内容，保持PG级别。",
@@ -509,6 +512,10 @@ DESCRIPTION_TYPES = {
         "OCR: Text with coordinates": "Extract all text and provide position coordinates [x1, y1, x2, y2] for each text region.",
         "OCR: Table to HTML": "If there is a table, convert it to HTML format using <table>, <tr>, and <td> tags.",
         "OCR: Structured JSON": "Extract all information in structured JSON format with key-value pairs.",
+        "🔀 Compare products": "Compare these product images side by side. List: 1) design differences, 2) color variations, 3) feature changes, 4) quality assessment, 5) which one to recommend and why.",
+        "🔀 Before/After comparison": "Analyze the before (first image) and after (last image) states: 1) What changed? 2) Quantify improvements if measurable, 3) Rate the transformation quality 1-10, 4) What could be improved further?",
+        "🔀 Time-series analysis": "These images show a sequence over time. Describe: 1) progression and trends, 2) identify causality between frames, 3) predict what happens next, 4) rate of change (fast/slow/accelerating), 5) any anomalies.",
+        "🔀 Quality control": "Review these quality control images: 1) identify defects in each, 2) classify defect types, 3) rate pass/fail for each, 4) percentage meeting standards, 5) recommend corrective actions, 6) any systematic issues?",
         "Custom": ""
     },
     "ru": {
@@ -525,6 +532,10 @@ DESCRIPTION_TYPES = {
         "OCR: Текст с координатами": "Извлеки весь текст и укажи координаты позиции [x1, y1, x2, y2] для каждой текстовой области.",
         "OCR: Таблица в HTML": "Если есть таблица, преобразуй её в HTML формат с тегами <table>, <tr> и <td>.",
         "OCR: Структурированный JSON": "Извлеки всю информацию в структурированном JSON формате с ключами и значениями.",
+        "🔀 Сравнить товары": "Сравни эти изображения товаров. Перечисли: 1) различия в дизайне, 2) варианты цветов, 3) изменения функций, 4) оценка качества, 5) какой рекомендуешь и почему.",
+        "🔀 Сравнение до/после": "Проанализируй состояния до (первое изображение) и после (последнее): 1) Что изменилось? 2) Количественно оцени улучшения, 3) Оцени качество преобразования 1-10, 4) Что можно улучшить?",
+        "🔀 Анализ временного ряда": "Эти изображения показывают последовательность во времени. Опиши: 1) развитие и тренды, 2) причинность между кадрами, 3) предскажи что будет дальше, 4) скорость изменений, 5) аномалии.",
+        "🔀 Контроль качества": "Проверь эти изображения контроля качества: 1) дефекты в каждом, 2) типы дефектов, 3) сдача/отказ для каждого, 4) процент соответствия стандартам, 5) корректирующие действия, 6) системные проблемы?",
         "Свой промпт": ""
     },
     "zh": {
@@ -541,6 +552,10 @@ DESCRIPTION_TYPES = {
         "OCR: 文字与坐标": "提取所有文字并提供每个文字区域的位置坐标[x1, y1, x2, y2]。",
         "OCR: 表格转HTML": "如果有表格，将其转换为HTML格式，使用<table>、<tr>和<td>标签。",
         "OCR: 结构化JSON": "以结构化JSON格式提取所有信息，包含键值对。",
+        "🔀 比较产品": "并排比较这些产品图像。列出：1）设计差异，2）颜色变化，3）功能变化，4）质量评估，5）推荐哪一个及原因。",
+        "🔀 前后对比": "分析之前（第一张图）和之后（最后一张）的状态：1）发生了什么变化？2）量化改进（如可衡量），3）转换质量评分1-10，4）还可以改进什么？",
+        "🔀 时间序列分析": "这些图像显示时间序列。描述：1）进度和趋势，2）识别帧之间的因果关系，3）预测接下来会发生什么，4）变化速率（快/慢/加速），5）任何异常。",
+        "🔀 质量控制": "审查这些质量控制图像：1）识别每个缺陷，2）分类缺陷类型，3）对每个评分合格/不合格，4）符合标准的百分比，5）推荐纠正措施，6）是否有系统性问题？",
         "自定义": ""
     }
 }
@@ -1244,6 +1259,63 @@ class ImageDescriptionGenerator:
         inputs = inputs.to(self.device)
         return inputs
 
+    def _prepare_inputs_multi_image(
+        self,
+        image_paths: list,
+        prompt: str,
+        model_name: str,
+        quantization: str,
+        seed: int
+    ):
+        """Prepare inputs for multiple images generation"""
+        # Загружаем модель если необходимо
+        self.load_model(model_name, quantization)
+
+        # Проверяем что модель загружена
+        if self.model is None or self.processor is None:
+            raise Exception("Модель не загружена. Попробуйте выбрать другую модель или перезапустить приложение.")
+
+        # Устанавливаем seed если указан
+        if seed != -1:
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(seed)
+
+        # Создаём список контента с множественными изображениями
+        content = []
+        for img_path in image_paths:
+            content.append({
+                "type": "image",
+                "image": img_path,
+            })
+
+        # Добавляем текстовый промпт в конец
+        content.append({"type": "text", "text": prompt})
+
+        messages = [
+            {
+                "role": "user",
+                "content": content,
+            }
+        ]
+
+        # Подготавливаем текст для модели
+        text = self.processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
+        # Обрабатываем изображения и текст
+        image_inputs, video_inputs = process_vision_info(messages)
+        inputs = self.processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to(self.device)
+        return inputs
+
     def generate_description(
         self,
         image_path: str,
@@ -1314,6 +1386,57 @@ class ImageDescriptionGenerator:
             inputs = self._prepare_inputs(
                 image_path, prompt, model_name, quantization, seed, is_video,
                 video_start_time, video_end_time
+            )
+
+            streamer = TextIteratorStreamer(
+                self.processor.tokenizer,
+                skip_special_tokens=True,
+                skip_prompt=True
+            )
+
+            generation_kwargs = {
+                **inputs,
+                "max_new_tokens": max_new_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "top_k": top_k,
+                "do_sample": True if temperature > 0 else False,
+                "use_cache": True,
+                "streamer": streamer,
+            }
+
+            # Run generation in a separate thread
+            thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+            thread.start()
+
+            # Yield tokens as they come
+            generated_text = ""
+            for new_text in streamer:
+                generated_text += new_text
+                yield generated_text
+
+            thread.join()
+
+        except Exception as e:
+            error_msg = get_text("error_generation").format(str(e))
+            yield error_msg
+
+    def generate_description_multi_image_stream(
+        self,
+        image_paths: list,
+        prompt: str,
+        model_name: str,
+        quantization: str = "4-bit",
+        max_new_tokens: int = 2048,
+        temperature: float = 0.6,
+        top_p: float = 0.9,
+        top_k: int = 50,
+        seed: int = -1
+    ) -> Generator[str, None, None]:
+        """Генерация описания для множественных изображений со streaming"""
+        try:
+            inputs = self._prepare_inputs_multi_image(
+                image_paths, prompt, model_name, quantization, seed
             )
 
             streamer = TextIteratorStreamer(
@@ -1516,6 +1639,168 @@ def process_single_image(
                 os.remove(temp_path)
             except:
                 pass
+
+        # Clean up GPU memory
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+def process_multi_image(
+    multi_images_list,
+    description_type: str,
+    description_length: str,
+    custom_prompt: str,
+    extra_options: list,
+    character_name: str,
+    num_variants: int,
+    model_name: str,
+    quantization: str,
+    max_new_tokens: int,
+    temperature: float,
+    top_p: float,
+    top_k: int,
+    seed: int,
+    use_streaming: bool = True,
+    progress=gr.Progress(track_tqdm=True)
+) -> Generator:
+    """Обработка множественных изображений с генерацией вариантов и streaming output"""
+    global stop_generation_flag
+    reset_stop_flag()
+    start_time = time.time()
+
+    # Start capturing console output
+    log_capture.clear_logs()
+    log_capture.start_capture()
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Начало генерации для множественных изображений...")
+
+    # Check if we have images
+    if not multi_images_list or len(multi_images_list) == 0:
+        yield "❌ Ошибка: Загрузите хотя бы одно изображение", "", [], None, log_capture.get_logs()
+        return
+
+    # Extract file paths from Gallery format
+    if isinstance(multi_images_list, list):
+        # Gallery returns list of dicts or tuples or strings
+        image_paths = []
+        for item in multi_images_list:
+            if isinstance(item, dict) and 'name' in item:
+                image_paths.append(item['name'])
+            elif isinstance(item, tuple):
+                image_paths.append(item[0])
+            elif isinstance(item, str):
+                image_paths.append(item)
+            else:
+                image_paths.append(str(item))
+    else:
+        yield "❌ Ошибка: Неверный формат изображений", "", [], None, log_capture.get_logs()
+        return
+
+    num_images = len(image_paths)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Загружено {num_images} изображений")
+
+    # Limit to 20 images max
+    if num_images > 20:
+        yield f"❌ Ошибка: Максимум 20 изображений, загружено {num_images}", "", [], None, log_capture.get_logs()
+        return
+
+    # Build prompt from type, length, custom, extra options and character name
+    final_prompt = build_prompt(
+        description_type, description_length, custom_prompt,
+        extra_options=extra_options or [],
+        character_name=character_name or "",
+        is_video=False  # Always false for multi-image
+    )
+    if not final_prompt.strip():
+        yield "❌ Ошибка: Промпт пустой", "", [], None, log_capture.get_logs()
+        return
+
+    num_variants = int(num_variants) if num_variants and str(num_variants).strip() else 1
+
+    try:
+        results = []
+        variant_times = []
+
+        for i in range(num_variants):
+            # Check stop flag
+            if stop_generation_flag:
+                elapsed_time = time.time() - start_time
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация остановлена пользователем")
+                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs()
+                return
+
+            variant_start = time.time()
+            variant_seed = seed if seed == -1 else seed + i
+            memory_info = get_memory_info()
+            status_msg = f"{get_text('generating')} ({get_text('variant')} {i+1}/{num_variants}) | {num_images} изображений | {memory_info}"
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация варианта {i+1}/{num_variants}, seed={variant_seed}")
+
+            if use_streaming:
+                # Stream the generation for real-time output
+                current_result = ""
+                for partial_result in generator.generate_description_multi_image_stream(
+                    image_paths=image_paths,
+                    prompt=final_prompt,
+                    model_name=model_name,
+                    quantization=quantization,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    seed=variant_seed
+                ):
+                    if stop_generation_flag:
+                        break
+                    current_result = partial_result
+                    # Update results with streaming text
+                    temp_results = results + [current_result]
+                    yield status_msg, final_prompt, temp_results, None, log_capture.get_logs()
+
+                result = current_result
+            else:
+                # Non-streaming generation (not implemented yet, use streaming)
+                yield status_msg, final_prompt, results, None, log_capture.get_logs()
+                # Fallback to streaming
+                for partial_result in generator.generate_description_multi_image_stream(
+                    image_paths=image_paths,
+                    prompt=final_prompt,
+                    model_name=model_name,
+                    quantization=quantization,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    seed=variant_seed
+                ):
+                    result = partial_result
+
+            variant_time = time.time() - variant_start
+            variant_times.append(variant_time)
+            results.append(result)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Вариант {i+1} завершен за {variant_time:.1f}s")
+
+        # Calculate processing time
+        elapsed_time = time.time() - start_time
+        memory_info = get_memory_info()
+
+        # Build detailed status with per-variant timing
+        timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}) | {memory_info}"
+
+        # Prepare download file
+        download_path = None
+        if results:
+            all_text = "\n\n".join([f"=== Variant {i+1} (Time: {variant_times[i]:.1f}s) ===\n{r}" for i, r in enumerate(results)])
+            download_path = save_text_to_file(all_text, f"multi_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация завершена успешно за {elapsed_time:.1f}s")
+        yield final_status, final_prompt, results, download_path, log_capture.get_logs()
+
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Ошибка: {str(e)}")
+        yield f"❌ Error: {str(e)}", final_prompt, [], None, log_capture.get_logs()
+    finally:
+        # Stop capturing console output
+        log_capture.stop_capture()
 
         # Clean up GPU memory
         gc.collect()
@@ -1881,6 +2166,35 @@ def create_interface():
                                         scale=3
                                     )
                                     single_stop_btn_video = gr.Button(
+                                        get_text("stop_btn"),
+                                        variant="stop",
+                                        scale=1,
+                                        interactive=False
+                                    )
+
+                            multi_image_tab = gr.TabItem("🖼️✕ Несколько изображений")
+                            with multi_image_tab:
+                                multi_images = gr.Gallery(
+                                    label="Загрузите несколько изображений (до 20)",
+                                    columns=4,
+                                    rows=3,
+                                    height=400,
+                                    allow_preview=True,
+                                    show_label=True,
+                                    type="filepath",
+                                    object_fit="contain",
+                                    show_download_button=False
+                                )
+                                gr.Markdown("💡 **Подсказка:** Загрузите 2-20 изображений для сравнения, анализа временных рядов или контроля качества")
+                                # Duplicate Generate/Stop buttons for quick access
+                                with gr.Row():
+                                    single_generate_btn_multi = gr.Button(
+                                        get_text("generate_btn"),
+                                        variant="primary",
+                                        elem_classes="generate-btn",
+                                        scale=3
+                                    )
+                                    single_stop_btn_multi = gr.Button(
                                         get_text("stop_btn"),
                                         variant="stop",
                                         scale=1,
@@ -2462,9 +2776,11 @@ def create_interface():
                 gr.update(value=get_text("generating"), interactive=False),  # single_submit_btn
                 gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_image
                 gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_video
+                gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_multi
                 gr.update(interactive=True),   # single_stop_btn
                 gr.update(interactive=True),   # single_stop_btn_image
                 gr.update(interactive=True),   # single_stop_btn_video
+                gr.update(interactive=True),   # single_stop_btn_multi
                 "", "", *[gr.update(value="") for _ in range(5)], None, ""
             )
 
@@ -2485,19 +2801,21 @@ def create_interface():
                     else:
                         variant_outputs.append(gr.update(value=""))
 
-                # Add model info to status
+                # Add model info above status
                 cached_size = get_model_cache_size(model_name)
                 size_str = f" [{cached_size}]" if cached_size else ""
-                status_with_model = f"{status}\n\n✅ **{model_name}**{size_str} | {quantization}"
+                status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
 
                 # Keep buttons disabled during generation
                 yield (
                     gr.update(value=get_text("generating"), interactive=False),  # single_submit_btn
                     gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_image
                     gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_video
+                    gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_multi
                     gr.update(interactive=True),   # single_stop_btn
                     gr.update(interactive=True),   # single_stop_btn_image
                     gr.update(interactive=True),   # single_stop_btn_video
+                    gr.update(interactive=True),   # single_stop_btn_multi
                     status_with_model, prompt_used, *variant_outputs, download_path, console_logs
                 )
 
@@ -2513,19 +2831,21 @@ def create_interface():
                 else:
                     final_outputs.append(gr.update(value=""))
 
-            # Add model info to final status
+            # Add model info above final status
             cached_size = get_model_cache_size(model_name)
             size_str = f" [{cached_size}]" if cached_size else ""
-            final_status_with_model = f"{status}\n\n✅ **{model_name}**{size_str} | {quantization}"
+            final_status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
 
             # Re-enable all generate buttons, disable all stop buttons
             yield (
                 gr.update(value=get_text("generate_btn"), interactive=True),  # single_submit_btn
                 gr.update(value=get_text("generate_btn"), interactive=True),  # single_generate_btn_image
                 gr.update(value=get_text("generate_btn"), interactive=True),  # single_generate_btn_video
+                gr.update(value=get_text("generate_btn"), interactive=True),  # single_generate_btn_multi
                 gr.update(interactive=False),  # single_stop_btn
                 gr.update(interactive=False),  # single_stop_btn_image
                 gr.update(interactive=False),  # single_stop_btn_video
+                gr.update(interactive=False),  # single_stop_btn_multi
                 final_status_with_model, prompt_used, *final_outputs, download_path, final_logs
             )
 
@@ -2550,7 +2870,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         # Duplicate Generate buttons in Image/Video tabs - same functionality
@@ -2575,7 +2895,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         single_generate_btn_video.click(
@@ -2599,7 +2919,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         # Duplicate Stop buttons in Image/Video tabs
@@ -2609,6 +2929,122 @@ def create_interface():
         )
 
         single_stop_btn_video.click(
+            fn=stop_generation,
+            outputs=single_status
+        )
+
+        # Multi-image processing wrapper
+        def process_multi_image_wrapper(multi_images_list, desc_type, desc_length, custom_prompt,
+                                       extra_options, character_name, num_variants,
+                                       model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
+            # Start capturing console output
+            log_capture.clear_logs()
+            log_capture.start_capture()
+
+            # Disable all generate buttons, enable all stop buttons
+            yield (
+                gr.update(value=get_text("generating"), interactive=False),  # single_submit_btn
+                gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_image
+                gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_video
+                gr.update(value=get_text("generating"), interactive=False),  # single_generate_btn_multi
+                gr.update(interactive=True),   # single_stop_btn
+                gr.update(interactive=True),   # single_stop_btn_image
+                gr.update(interactive=True),   # single_stop_btn_video
+                gr.update(interactive=True),   # single_stop_btn_multi
+                "", "", *[gr.update(value="") for _ in range(5)], None, ""
+            )
+
+            results = []
+            download_path = None
+
+            # Process and yield results
+            for status, prompt_used, results, download_path, console_logs in process_multi_image(
+                multi_images_list, desc_type, desc_length, custom_prompt,
+                extra_options, character_name, num_variants,
+                model_name, quantization, max_tokens, temperature, top_p, top_k, seed
+            ):
+                # Prepare outputs for each variant box
+                variant_outputs = []
+                for i in range(5):
+                    if i < len(results):
+                        variant_outputs.append(gr.update(value=results[i]))
+                    else:
+                        variant_outputs.append(gr.update(value=""))
+
+                # Add model info above status
+                cached_size = get_model_cache_size(model_name)
+                size_str = f" [{cached_size}]" if cached_size else ""
+                status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
+
+                # Keep buttons disabled during generation
+                yield (
+                    gr.update(value=get_text("generating"), interactive=False),
+                    gr.update(value=get_text("generating"), interactive=False),
+                    gr.update(value=get_text("generating"), interactive=False),
+                    gr.update(value=get_text("generating"), interactive=False),
+                    gr.update(interactive=True),
+                    gr.update(interactive=True),
+                    gr.update(interactive=True),
+                    gr.update(interactive=True),
+                    status_with_model, prompt_used, *variant_outputs, download_path, console_logs
+                )
+
+            # Stop capturing and get final logs
+            log_capture.stop_capture()
+            final_logs = log_capture.get_logs()
+
+            # Re-enable button at end
+            final_outputs = []
+            for i in range(5):
+                if i < len(results):
+                    final_outputs.append(gr.update(value=results[i]))
+                else:
+                    final_outputs.append(gr.update(value=""))
+
+            # Add model info above final status
+            cached_size = get_model_cache_size(model_name)
+            size_str = f" [{cached_size}]" if cached_size else ""
+            final_status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
+
+            # Re-enable all generate buttons, disable all stop buttons
+            yield (
+                gr.update(value=get_text("generate_btn"), interactive=True),
+                gr.update(value=get_text("generate_btn"), interactive=True),
+                gr.update(value=get_text("generate_btn"), interactive=True),
+                gr.update(value=get_text("generate_btn"), interactive=True),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                final_status_with_model, prompt_used, *final_outputs, download_path, final_logs
+            )
+
+        # Wire up multi-image generate button
+        single_generate_btn_multi.click(
+            fn=process_multi_image_wrapper,
+            inputs=[
+                multi_images,
+                single_desc_type,
+                single_desc_length,
+                single_custom_prompt,
+                single_extra_options,
+                single_character_name,
+                single_num_variants,
+                model_dropdown,
+                quantization_dropdown,
+                max_tokens_slider,
+                temperature_slider,
+                top_p_slider,
+                top_k_slider,
+                seed_number
+            ],
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi,
+                     single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi,
+                     single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+        )
+
+        # Wire up multi-image stop button
+        single_stop_btn_multi.click(
             fn=stop_generation,
             outputs=single_status
         )
