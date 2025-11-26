@@ -5,7 +5,7 @@
 Portable application with web interface for working with Qwen3-VL multimodal models. Supports Abliterated models for working with any content without censorship.
 
 [![Telegram](https://img.shields.io/badge/Telegram-NEURO--SOFT-blue?logo=telegram)](https://t.me/neuroport)
-[![GitHub Stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=social)](https://github.com/timoncool/qwen3-vl)
+[![GitHub Stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=social)](https://github.com/timoncool/SuperCaption_Qwen3-VL)
 
 **[Русский](README.md) | [中文](README_CN.md)**
 
@@ -24,7 +24,7 @@ Key model capabilities:
 - Object Detection with coordinates
 - Reasoning mode (Thinking) for complex tasks
 
-Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
+Learn more: [Qwen3-VL on GitHub](https://github.com/QwenLM/Qwen3-VL)
 
 ---
 
@@ -139,33 +139,55 @@ Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
 - **Spatial Analysis** — layout, perspective, object relationships
 - **Problem Finding** — what works, what to improve
 
+### 💡 Custom Prompts
+Besides the ready-made templates, you can write **any custom prompts** in natural language — the model will understand them. Simply describe what you need: "Describe this photo as if you were a travel agent", "Find all errors in this screenshot", "Make a shopping list from this fridge photo", etc.
+
+**Tip:** When selecting a template, its text appears in the input field — you can immediately edit it to match your task.
+
+---
+
+## Batch Processing (Batch Mode)
+
+The application supports batch processing for mass description generation:
+
+1. **Upload multiple files** — drag a folder or select multiple images/videos
+2. **Choose a prompt** — one prompt will be applied to all files
+3. **Start processing** — results are generated sequentially
+4. **Export results** — to TXT (separate file per image), JSON, or CSV
+
+**Features:**
+- Progress displayed in real-time
+- Processing can be stopped at any moment
+- Results are saved even if interrupted
+- Export to the source files folder is supported
+
 ---
 
 ## Screenshots
 
 ### OCR — Text Recognition
-![OCR](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
+![OCR](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
 
 ### Image Description
-![Description](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/02-image-description.png?raw=true)
+![Description](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/02-image-description.png?raw=true)
 
 ### Video Analysis
-![Video](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/03-video-analysis.png?raw=true)
+![Video](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/03-video-analysis.png?raw=true)
 
 ### Batch Processing
-![Batch](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/04-batch-processing.png?raw=true)
+![Batch](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/04-batch-processing.png?raw=true)
 
 ### Multi-image Comparison
-![Compare](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/05-multi-image-compare.png?raw=true)
+![Compare](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/05-multi-image-compare.png?raw=true)
 
 ### Math Problem Solving
-![Math](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/06-math-solver.png?raw=true)
+![Math](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/06-math-solver.png?raw=true)
 
 ### Object Detection
-![Detection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/07-object-detection.png?raw=true)
+![Detection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/07-object-detection.png?raw=true)
 
 ### CUDA Version Selection during Installation
-![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 ---
 
@@ -207,7 +229,7 @@ Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
    - Enter your GPU number (e.g., `3` for RTX 30xx) and press **Enter**
    - Press **Enter** again to confirm your selection
 
-   ![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+   ![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 4. Run `run.bat` to launch the application
 
@@ -228,7 +250,7 @@ The script automatically:
 
 ```bash
 # Clone repository
-git clone https://github.com/timoncool/qwen3-vl.git
+git clone https://github.com/timoncool/SuperCaption_Qwen3-VL.git
 cd qwen3-vl
 
 # Create virtual environment
@@ -308,11 +330,27 @@ qwen3-vl/
 - Ensure ffprobe/ffmpeg is installed
 - Check video format (MP4, AVI, MOV, MKV supported)
 
+### Text cuts off in the middle
+- Increase the **Max Tokens** value in settings
+- The model stops generating when it reaches the token limit
+- Recommended values: 512-2048 for short descriptions, 2048-4096 for long ones
+
+### Text repeats and duplicates
+- Decrease the **Max Tokens** value in settings
+- Too high token limit can cause generation to loop
+- Try values: 256-512 for simple tasks, 1024 for complex ones
+
+---
+
+## For Developers
+
+This project is an excellent starting point for building your own Qwen3-VL-based application. Simply remove unnecessary prompt templates and add your business logic. The project structure is ready for extension.
+
 ---
 
 ## Credits
 
-**Original model:** [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL) by Alibaba Cloud
+**Original model:** [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) by Alibaba Cloud
 
 **Portable version:**
 - [Nerual Dreming](https://t.me/nerual_dreming) — founder of [ArtGeneration.me](https://artgeneration.me/), tech blogger, and neuro-evangelist.
@@ -324,7 +362,7 @@ qwen3-vl/
 
 ## License
 
-Project uses [Qwen](https://github.com/QwenLM/Qwen2.5-VL) models under Apache 2.0 license.
+Project uses [Qwen](https://github.com/QwenLM/Qwen3-VL) models under Apache 2.0 license.
 
 ---
 
@@ -334,6 +372,6 @@ If SuperCaption helped you — give it a ⭐ on GitHub!
 
 It's free and takes a second, but really motivates project development.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=for-the-badge&logo=github)](https://github.com/timoncool/qwen3-vl/stargazers)
+[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=for-the-badge&logo=github)](https://github.com/timoncool/SuperCaption_Qwen3-VL/stargazers)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/SuperCaption_Qwen3-VL&type=Date)](https://star-history.com/#timoncool/SuperCaption_Qwen3-VL&Date)
