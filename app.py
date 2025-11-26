@@ -2359,7 +2359,7 @@ def create_interface():
             <p style="font-size: 0.9rem; margin-top: 0.75rem; opacity: 0.85;">
                 Портативная версия от <a href="https://t.me/nerual_dreming" target="_blank">Nerual Dreming</a> и
                 <a href="https://t.me/ruweb24" target="_blank">Slait</a> |
-                <a href="https://t.me/neuroport" target="_blank">👾 НЕЙРО-СОФТ</a>
+                Телеграм канал: <a href="https://t.me/neuroport" target="_blank">👾 НЕЙРО-СОФТ</a>
             </p>
         </div>
         """)
