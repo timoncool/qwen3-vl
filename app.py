@@ -1387,18 +1387,47 @@ class ImageDescriptionGenerator:
                 else:
                     load_kwargs["torch_dtype"] = dtype
 
-                # SDPA (Scaled Dot Product Attention) - встроен в PyTorch 2.0+
-                # Быстрый и работает на Windows без доп. зависимостей
+                # Попробуем Flash Attention 2 для максимальной скорости
                 if torch.cuda.is_available():
-                    load_kwargs["attn_implementation"] = "sdpa"
-                    print("🚀 SDPA attention (PyTorch native)")
+                    try:
+                        # Проверяем доступность Flash Attention 2
+                        import flash_attn
+                        load_kwargs["attn_implementation"] = "flash_attention_2"
+                        print("🚀 Flash Attention 2 (максимальная скорость)")
+                    except ImportError:
+                        # Fallback на SDPA (медленнее, но стабильно)
+                        load_kwargs["attn_implementation"] = "sdpa"
+                        print("⚡ SDPA attention (PyTorch native - медленнее Flash Attention 2)")
+                        print("💡 Установите flash-attn для ускорения: pip install flash-attn --no-build-isolation")
 
                 self.model = Qwen3VLForConditionalGeneration.from_pretrained(
                     model_name,
                     **load_kwargs
                 )
+
+                # Оптимизация с torch.compile (только для non-quantized моделей)
+                # torch.compile может не работать с BitsAndBytes квантизацией
+                if quantization == "Нет" and torch.cuda.is_available():
+                    try:
+                        print("🔥 Компиляция модели с torch.compile (ускорение ~20-40%)...")
+                        # mode="reduce-overhead" лучше для generative tasks
+                        self.model.forward = torch.compile(
+                            self.model.forward,
+                            mode="reduce-overhead",
+                            fullgraph=False
+                        )
+                        print("✅ Компиляция завершена (первая генерация будет медленнее)")
+                    except Exception as e:
+                        print(f"⚠️ torch.compile недоступен: {e}")
+
                 print(f"🔄 Загрузка процессора...")
-                self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+                self.processor = AutoProcessor.from_pretrained(
+                    model_name,
+                    trust_remote_code=True,
+                    # Оптимизация разрешения для скорости
+                    min_pixels=256*28*28,  # Min resolution
+                    max_pixels=1280*28*28  # Max resolution (не слишком большое)
+                )
 
             load_time = time.time() - load_start_time
             self.current_model_name = model_name
@@ -1582,15 +1611,26 @@ class ImageDescriptionGenerator:
 
             # Non-streaming generation (inference_mode быстрее чем no_grad)
             with torch.inference_mode():
-                generated_ids = self.model.generate(
+                # Оптимизированные параметры генерации
+                gen_kwargs = {
                     **inputs,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    top_p=top_p,
-                    top_k=top_k,
-                    do_sample=True if temperature > 0 else False,
-                    use_cache=True,  # KV кэширование для ускорения
-                )
+                    "max_new_tokens": max_new_tokens,
+                    "use_cache": True,  # KV кэширование для ускорения
+                    "pad_token_id": self.processor.tokenizer.pad_token_id,
+                }
+
+                # Greedy decoding быстрее sampling
+                if temperature > 0:
+                    gen_kwargs.update({
+                        "do_sample": True,
+                        "temperature": temperature,
+                        "top_p": top_p,
+                        "top_k": top_k,
+                    })
+                else:
+                    gen_kwargs["do_sample"] = False
+
+                generated_ids = self.model.generate(**gen_kwargs)
 
             # Декодируем результат
             generated_ids_trimmed = [

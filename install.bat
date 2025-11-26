@@ -138,6 +138,55 @@ python\python.exe -m pip install torch==%TORCH_VERSION% torchvision==%TORCHVISIO
 echo [5/6] Установка остальных зависимостей...
 python\python.exe -m pip install -r requirements.txt --no-warn-script-location
 
+echo [5.5/6] Установка Flash Attention 2 для ускорения (опционально)...
+echo.
+echo Flash Attention 2 ускоряет генерацию в 5-10 раз!
+echo Рекомендуется для RTX 30xx/40xx серий.
+echo.
+
+REM Устанавливаем flash-attn в зависимости от GPU
+if "%GPU_CHOICE%"=="3" (
+    echo Установка Flash Attention 2 для RTX 30xx ^(CUDA 12.6^)...
+    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    if errorlevel 1 (
+        echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
+        echo Можно установить вручную позже.
+    ) else (
+        echo ✅ Flash Attention 2 установлен успешно!
+    )
+)
+if "%GPU_CHOICE%"=="4" (
+    echo Установка Flash Attention 2 для RTX 40xx ^(CUDA 12.8^)...
+    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    if errorlevel 1 (
+        echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
+        echo Можно установить вручную позже.
+    ) else (
+        echo ✅ Flash Attention 2 установлен успешно!
+    )
+)
+if "%GPU_CHOICE%"=="5" (
+    echo Установка Flash Attention 2 для RTX 50xx ^(CUDA 12.9^)...
+    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    if errorlevel 1 (
+        echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
+        echo Можно установить вручную позже.
+    ) else (
+        echo ✅ Flash Attention 2 установлен успешно!
+    )
+)
+if "%GPU_CHOICE%"=="1" (
+    echo ⚠️ Flash Attention 2 не рекомендуется для GTX 10xx ^(требуется Ampere или новее^)
+)
+if "%GPU_CHOICE%"=="2" (
+    echo ⚠️ Flash Attention 2 не рекомендуется для RTX 20xx ^(требуется Ampere или новее^)
+)
+if "%GPU_CHOICE%"=="6" (
+    echo Flash Attention 2 пропущен ^(CPU mode^)
+)
+
+echo.
+
 echo [6/6] Финализация установки...
 REM Создаем конфигурационный файл с версией CUDA
 echo %CUDA_VERSION%> cuda_version.txt
