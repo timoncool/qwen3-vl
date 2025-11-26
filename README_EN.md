@@ -164,6 +164,9 @@ Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
 ### Object Detection
 ![Detection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/07-object-detection.png?raw=true)
 
+### Model Selection during Installation
+![Model Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/%D0%A1%D0%BD%D0%B8%D0%BC%D0%BE%D0%BA%20%D1%8D%D0%BA%D1%80%D0%B0%D0%BD%D0%B0%202025-11-26%20093555.png?raw=true)
+
 ---
 
 ## Available Models
@@ -199,7 +202,11 @@ Learn more: [Qwen2.5-VL on GitHub](https://github.com/QwenLM/Qwen2.5-VL)
 
 1. Download and extract the archive
 2. Run `install.bat` to install dependencies
-3. Run `run.bat` to launch the application
+3. **Select model during installation:**
+   - A list of available models with numbers will appear
+   - Enter the model number (e.g., `1`) and press **Enter**
+   - Press **Enter** again to confirm your selection
+4. Run `run.bat` to launch the application
 
 ### Launch with Auto-update
 
@@ -263,7 +270,8 @@ qwen3-vl/
 ## Requirements
 
 ### Minimum
-- **Python** 3.10+
+- **Git** — for auto-updates (download: [git-scm.com](https://git-scm.com/downloads))
+- **Python** 3.10+ (embedded in portable version)
 - **CUDA** compatible GPU (NVIDIA)
 - **VRAM**: 4 GB (for 2B model with 4-bit quantization)
 - **RAM**: 8 GB

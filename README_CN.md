@@ -164,6 +164,9 @@
 ### 目标检测
 ![Detection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/07-object-detection.png?raw=true)
 
+### 安装时选择模型
+![Model Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/%D0%A1%D0%BD%D0%B8%D0%BC%D0%BE%D0%BA%20%D1%8D%D0%BA%D1%80%D0%B0%D0%BD%D0%B0%202025-11-26%20093555.png?raw=true)
+
 ---
 
 ## 可用模型
@@ -199,7 +202,11 @@
 
 1. 下载并解压压缩包
 2. 运行 `install.bat` 安装依赖
-3. 运行 `run.bat` 启动应用程序
+3. **安装时选择模型：**
+   - 将显示带编号的可用模型列表
+   - 输入模型编号（例如 `1`）并按 **Enter**
+   - 再次按 **Enter** 确认选择
+4. 运行 `run.bat` 启动应用程序
 
 ### 带自动更新启动
 
@@ -263,7 +270,8 @@ qwen3-vl/
 ## 系统要求
 
 ### 最低配置
-- **Python** 3.10+
+- **Git** — 用于自动更新（下载：[git-scm.com](https://git-scm.com/downloads)）
+- **Python** 3.10+（便携版内置）
 - **CUDA** 兼容 GPU（NVIDIA）
 - **显存**：4 GB（用于带 4-bit 量化的 2B 模型）
 - **内存**：8 GB
