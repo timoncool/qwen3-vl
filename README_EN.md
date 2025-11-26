@@ -342,6 +342,12 @@ qwen3-vl/
 
 ---
 
+## For Developers
+
+This project is an excellent starting point for building your own Qwen3-VL-based application. Simply remove unnecessary prompt templates and add your business logic. The project structure is ready for extension.
+
+---
+
 ## Credits
 
 **Original model:** [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) by Alibaba Cloud
