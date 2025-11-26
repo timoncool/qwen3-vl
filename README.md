@@ -5,7 +5,7 @@
 Портативное приложение с веб-интерфейсом для работы с мультимодальными моделями Qwen3-VL. Поддерживает Abliterated модели для работы с любым контентом без цензуры.
 
 [![Telegram](https://img.shields.io/badge/Telegram-НЕЙРО--СОФТ-blue?logo=telegram)](https://t.me/neuroport)
-[![GitHub Stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=social)](https://github.com/timoncool/qwen3-vl)
+[![GitHub Stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=social)](https://github.com/timoncool/SuperCaption_Qwen3-VL)
 
 **[English](README_EN.md) | [中文](README_CN.md)**
 
@@ -24,7 +24,7 @@
 - Object Detection с координатами
 - Режим рассуждений (Thinking) для сложных задач
 
-Подробнее: [Qwen2.5-VL на GitHub](https://github.com/QwenLM/Qwen2.5-VL)
+Подробнее: [Qwen3-VL на GitHub](https://github.com/QwenLM/Qwen3-VL)
 
 ---
 
@@ -139,33 +139,55 @@
 - **Пространственный анализ** — компоновка, перспектива, отношения объектов
 - **Поиск проблем** — что работает, что улучшить
 
+### 💡 Свои промпты
+Помимо готовых шаблонов вы можете писать **любые собственные промпты** на естественном языке — модель их поймёт. Просто опишите что вам нужно: "Опиши эту фотографию как будто ты турагент", "Найди все ошибки на этом скриншоте", "Составь список покупок по фото холодильника" и т.д.
+
+**Совет:** При выборе шаблона его текст появляется в поле ввода — вы можете сразу отредактировать его под свою задачу.
+
+---
+
+## Пакетная обработка (Batch Mode)
+
+Приложение поддерживает пакетную обработку для массовой генерации описаний:
+
+1. **Загрузите несколько файлов** — перетащите папку или выберите несколько изображений/видео
+2. **Выберите промпт** — один промпт будет применён ко всем файлам
+3. **Запустите обработку** — результаты генерируются последовательно
+4. **Экспортируйте результаты** — в TXT (отдельный файл на каждое изображение), JSON или CSV
+
+**Особенности:**
+- Прогресс отображается в реальном времени
+- Можно остановить обработку в любой момент
+- Результаты сохраняются даже при прерывании
+- Поддерживается экспорт в папку с исходными файлами
+
 ---
 
 ## Скриншоты
 
 ### OCR — распознавание текста
-![OCR](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
+![OCR](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
 
 ### Описание изображений
-![Description](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/02-image-description.png?raw=true)
+![Description](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/02-image-description.png?raw=true)
 
 ### Анализ видео
-![Video](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/03-video-analysis.png?raw=true)
+![Video](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/03-video-analysis.png?raw=true)
 
 ### Пакетная обработка
-![Batch](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/04-batch-processing.png?raw=true)
+![Batch](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/04-batch-processing.png?raw=true)
 
 ### Сравнение нескольких изображений
-![Compare](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/05-multi-image-compare.png?raw=true)
+![Compare](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/05-multi-image-compare.png?raw=true)
 
 ### Решение математических задач
-![Math](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/06-math-solver.png?raw=true)
+![Math](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/06-math-solver.png?raw=true)
 
 ### Object Detection — обнаружение объектов
-![Detection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/07-object-detection.png?raw=true)
+![Detection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/07-object-detection.png?raw=true)
 
 ### Выбор версии CUDA при установке
-![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 ---
 
@@ -207,7 +229,7 @@
    - Введите номер вашей видеокарты (например, `3` для RTX 30xx) и нажмите **Enter**
    - Нажмите **Enter** ещё раз для подтверждения выбора
 
-   ![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+   ![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 4. Запустите `run.bat` для запуска приложения
 
@@ -228,7 +250,7 @@ run_with_update.bat
 
 ```bash
 # Клонирование репозитория
-git clone https://github.com/timoncool/qwen3-vl.git
+git clone https://github.com/timoncool/SuperCaption_Qwen3-VL.git
 cd qwen3-vl
 
 # Создание виртуального окружения
@@ -308,11 +330,21 @@ qwen3-vl/
 - Убедитесь что ffprobe/ffmpeg установлен
 - Проверьте формат видео (поддерживаются MP4, AVI, MOV, MKV)
 
+### Текст обрывается на середине
+- Увеличьте значение **Max Tokens** в настройках
+- Модель прекращает генерацию когда достигает лимита токенов
+- Рекомендуемые значения: 512-2048 для коротких описаний, 2048-4096 для длинных
+
+### Текст повторяется и дублируется
+- Уменьшите значение **Max Tokens** в настройках
+- Слишком большой лимит токенов может приводить к зацикливанию генерации
+- Попробуйте значения: 256-512 для простых задач, 1024 для сложных
+
 ---
 
 ## Credits
 
-**Оригинальная модель:** [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL) от Alibaba Cloud
+**Оригинальная модель:** [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL) от Alibaba Cloud
 
 **Портативная версия:**
 - [Nerual Dreming](https://t.me/nerual_dreming) — founder of [ArtGeneration.me](https://artgeneration.me/), tech blogger, and neuro-evangelist.
@@ -324,7 +356,7 @@ qwen3-vl/
 
 ## Лицензия
 
-Проект использует модели [Qwen](https://github.com/QwenLM/Qwen2.5-VL) под лицензией Apache 2.0.
+Проект использует модели [Qwen](https://github.com/QwenLM/Qwen3-VL) под лицензией Apache 2.0.
 
 ---
 
@@ -334,6 +366,6 @@ qwen3-vl/
 
 Это бесплатно и занимает секунду, но очень мотивирует на развитие проекта.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=for-the-badge&logo=github)](https://github.com/timoncool/qwen3-vl/stargazers)
+[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=for-the-badge&logo=github)](https://github.com/timoncool/SuperCaption_Qwen3-VL/stargazers)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/SuperCaption_Qwen3-VL&type=Date)](https://star-history.com/#timoncool/SuperCaption_Qwen3-VL&Date)

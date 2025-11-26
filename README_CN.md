@@ -5,7 +5,7 @@
 具有 Web 界面的便携式应用程序，用于处理 Qwen3-VL 多模态模型。支持 Abliterated 模型，可处理任何内容，无审查限制。
 
 [![Telegram](https://img.shields.io/badge/Telegram-NEURO--SOFT-blue?logo=telegram)](https://t.me/neuroport)
-[![GitHub Stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=social)](https://github.com/timoncool/qwen3-vl)
+[![GitHub Stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=social)](https://github.com/timoncool/SuperCaption_Qwen3-VL)
 
 **[Русский](README.md) | [English](README_EN.md)**
 
@@ -24,7 +24,7 @@
 - 带坐标的目标检测
 - 复杂任务的推理模式（Thinking）
 
-了解更多：[Qwen2.5-VL GitHub](https://github.com/QwenLM/Qwen2.5-VL)
+了解更多：[Qwen3-VL GitHub](https://github.com/QwenLM/Qwen3-VL)
 
 ---
 
@@ -139,33 +139,55 @@
 - **空间分析** — 布局、透视、对象关系
 - **问题发现** — 什么有效，什么需要改进
 
+### 💡 自定义提示词
+除了现成的模板外，您还可以用自然语言编写**任何自定义提示词** — 模型会理解它们。只需描述您需要什么："像旅行社一样描述这张照片"、"找出这个截图中的所有错误"、"根据冰箱照片列出购物清单"等。
+
+**提示：** 选择模板时，其文本会出现在输入框中 — 您可以立即编辑它以匹配您的任务。
+
+---
+
+## 批量处理（Batch Mode）
+
+应用程序支持批量处理以进行大规模描述生成：
+
+1. **上传多个文件** — 拖动文件夹或选择多个图像/视频
+2. **选择提示词** — 一个提示词将应用于所有文件
+3. **开始处理** — 结果按顺序生成
+4. **导出结果** — 到 TXT（每个图像一个文件）、JSON 或 CSV
+
+**特点：**
+- 实时显示进度
+- 可随时停止处理
+- 即使中断也会保存结果
+- 支持导出到源文件夹
+
 ---
 
 ## 截图
 
 ### OCR — 文字识别
-![OCR](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
+![OCR](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/01-ocr-text-recognition.png?raw=true)
 
 ### 图像描述
-![Description](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/02-image-description.png?raw=true)
+![Description](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/02-image-description.png?raw=true)
 
 ### 视频分析
-![Video](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/03-video-analysis.png?raw=true)
+![Video](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/03-video-analysis.png?raw=true)
 
 ### 批量处理
-![Batch](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/04-batch-processing.png?raw=true)
+![Batch](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/04-batch-processing.png?raw=true)
 
 ### 多图像比较
-![Compare](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/05-multi-image-compare.png?raw=true)
+![Compare](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/05-multi-image-compare.png?raw=true)
 
 ### 数学问题解决
-![Math](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/06-math-solver.png?raw=true)
+![Math](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/06-math-solver.png?raw=true)
 
 ### 目标检测
-![Detection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/07-object-detection.png?raw=true)
+![Detection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/07-object-detection.png?raw=true)
 
 ### 安装时选择 CUDA 版本
-![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 ---
 
@@ -207,7 +229,7 @@
    - 输入您的显卡编号（例如 `3` 表示 RTX 30xx）并按 **Enter**
    - 再次按 **Enter** 确认选择
 
-   ![CUDA Selection](https://github.com/timoncool/qwen3-vl/blob/main/screenshots/08-cuda-selection.png?raw=true)
+   ![CUDA Selection](https://github.com/timoncool/SuperCaption_Qwen3-VL/blob/main/screenshots/08-cuda-selection.png?raw=true)
 
 4. 运行 `run.bat` 启动应用程序
 
@@ -228,7 +250,7 @@ run_with_update.bat
 
 ```bash
 # 克隆仓库
-git clone https://github.com/timoncool/qwen3-vl.git
+git clone https://github.com/timoncool/SuperCaption_Qwen3-VL.git
 cd qwen3-vl
 
 # 创建虚拟环境
@@ -308,11 +330,21 @@ qwen3-vl/
 - 确保安装了 ffprobe/ffmpeg
 - 检查视频格式（支持 MP4、AVI、MOV、MKV）
 
+### 文本在中间截断
+- 在设置中增加 **Max Tokens** 值
+- 模型在达到令牌限制时会停止生成
+- 推荐值：短描述 512-2048，长描述 2048-4096
+
+### 文本重复和重叠
+- 在设置中减少 **Max Tokens** 值
+- 令牌限制过高可能导致生成循环
+- 尝试值：简单任务 256-512，复杂任务 1024
+
 ---
 
 ## 致谢
 
-**原始模型：** [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL)，阿里云出品
+**原始模型：** [Qwen3-VL](https://github.com/QwenLM/Qwen3-VL)，阿里云出品
 
 **便携版：**
 - [Nerual Dreming](https://t.me/nerual_dreming) — founder of [ArtGeneration.me](https://artgeneration.me/), tech blogger, and neuro-evangelist.
@@ -324,7 +356,7 @@ qwen3-vl/
 
 ## 许可证
 
-项目使用 [Qwen](https://github.com/QwenLM/Qwen2.5-VL) 模型，采用 Apache 2.0 许可证。
+项目使用 [Qwen](https://github.com/QwenLM/Qwen3-VL) 模型，采用 Apache 2.0 许可证。
 
 ---
 
@@ -334,6 +366,6 @@ qwen3-vl/
 
 这是免费的，只需一秒钟，但真的能激励项目发展。
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/qwen3-vl?style=for-the-badge&logo=github)](https://github.com/timoncool/qwen3-vl/stargazers)
+[![GitHub Repo stars](https://img.shields.io/github/stars/timoncool/SuperCaption_Qwen3-VL?style=for-the-badge&logo=github)](https://github.com/timoncool/SuperCaption_Qwen3-VL/stargazers)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/qwen3-vl&type=Date)](https://star-history.com/#timoncool/qwen3-vl&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=timoncool/SuperCaption_Qwen3-VL&type=Date)](https://star-history.com/#timoncool/SuperCaption_Qwen3-VL&Date)
