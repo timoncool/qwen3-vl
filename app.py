@@ -2343,6 +2343,9 @@ def create_interface():
                     with gr.Column(scale=1, elem_classes="card-style"):
                         gr.Markdown("### 📷 Входные данные")
 
+                        # Track which media tab is active
+                        active_media_type = gr.State("image")  # Default to image tab
+
                         # Tabs for Image and Video
                         media_tabs = gr.Tabs()
                         with media_tabs:
@@ -2863,14 +2866,18 @@ def create_interface():
 
         # Media tab selection handlers - update extra options when switching tabs
         def on_image_tab_select():
-            return gr.update(choices=get_extra_options(is_video=False), value=[]), False
+            return gr.update(choices=get_extra_options(is_video=False), value=[]), False, "image"
 
         def on_video_tab_select():
-            return gr.update(choices=get_extra_options(is_video=True), value=[]), True
+            return gr.update(choices=get_extra_options(is_video=True), value=[]), True, "video"
 
-        # Connect media tab selection to extra options update
-        image_tab.select(fn=on_image_tab_select, outputs=[single_extra_options, single_is_video])
-        video_tab.select(fn=on_video_tab_select, outputs=[single_extra_options, single_is_video])
+        def on_multi_image_tab_select():
+            return gr.update(choices=get_extra_options(is_video=False), value=[]), False, "multi"
+
+        # Connect media tab selection to extra options update and active media type
+        image_tab.select(fn=on_image_tab_select, outputs=[single_extra_options, single_is_video, active_media_type])
+        video_tab.select(fn=on_video_tab_select, outputs=[single_extra_options, single_is_video, active_media_type])
+        multi_image_tab.select(fn=on_multi_image_tab_select, outputs=[single_extra_options, single_is_video, active_media_type])
 
         def change_language(lang):
             global current_language
@@ -3021,7 +3028,16 @@ def create_interface():
         # Single image processing with button lock
         def process_single_wrapper(image, video, video_start_time, video_end_time, desc_type, desc_length, custom_prompt,
                                    extra_options, character_name, num_variants,
-                                   model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
+                                   model_name, quantization, max_tokens, temperature, top_p, top_k, seed, active_media_type):
+            # Force media type based on active tab
+            if active_media_type == "image":
+                video = None  # Ignore video input when image tab is active
+            elif active_media_type == "video":
+                image = None  # Ignore image input when video tab is active
+            elif active_media_type == "multi":
+                # Multi-image tab should not use this wrapper
+                pass
+
             # Start capturing console output
             log_capture.clear_logs()
             log_capture.start_capture()
@@ -3145,7 +3161,8 @@ def create_interface():
                 image, None, 0, 7200,  # video=None, default timestamps
                 desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
-                model_name, quantization, max_tokens, temperature, top_p, top_k, seed
+                model_name, quantization, max_tokens, temperature, top_p, top_k, seed,
+                "image"  # active_media_type
             )
 
         # Video-only wrapper - ignores image input
@@ -3157,7 +3174,8 @@ def create_interface():
                 None, video, video_start_time, video_end_time,  # image=None
                 desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
-                model_name, quantization, max_tokens, temperature, top_p, top_k, seed
+                model_name, quantization, max_tokens, temperature, top_p, top_k, seed,
+                "video"  # active_media_type
             )
 
         single_submit_btn.click(
@@ -3179,7 +3197,8 @@ def create_interface():
                 temperature_slider,
                 top_p_slider,
                 top_k_slider,
-                seed_number
+                seed_number,
+                active_media_type
             ],
             outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, thinking_accordion, thinking_output, single_prompt_used, image_preview_accordion, image_preview] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
