@@ -3141,7 +3141,7 @@ def create_interface():
                                        extra_options, character_name, num_variants,
                                        model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
             # Force video to None and use default video timestamps
-            return process_single_wrapper(
+            yield from process_single_wrapper(
                 image, None, 0, 7200,  # video=None, default timestamps
                 desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
@@ -3153,7 +3153,7 @@ def create_interface():
                                        extra_options, character_name, num_variants,
                                        model_name, quantization, max_tokens, temperature, top_p, top_k, seed):
             # Force image to None
-            return process_single_wrapper(
+            yield from process_single_wrapper(
                 None, video, video_start_time, video_end_time,  # image=None
                 desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
