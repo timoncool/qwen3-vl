@@ -147,7 +147,7 @@ echo.
 REM Устанавливаем flash-attn в зависимости от GPU
 if "%GPU_CHOICE%"=="3" (
     echo Установка Flash Attention 2 для RTX 30xx ^(CUDA 12.6^)...
-    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4+cu126torch2.6.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
@@ -157,7 +157,7 @@ if "%GPU_CHOICE%"=="3" (
 )
 if "%GPU_CHOICE%"=="4" (
     echo Установка Flash Attention 2 для RTX 40xx ^(CUDA 12.8^)...
-    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1+cu128torch2.7.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
@@ -166,8 +166,8 @@ if "%GPU_CHOICE%"=="4" (
     )
 )
 if "%GPU_CHOICE%"=="5" (
-    echo Установка Flash Attention 2 для RTX 50xx ^(CUDA 12.9^)...
-    python\python.exe -m pip install https://github.com/Wisdawn/flash-attention-windows/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp312-cp312-win_amd64.whl --no-warn-script-location
+    echo Установка Flash Attention 2 для RTX 50xx ^(CUDA 12.9 - используем CUDA 12.8 wheel^)...
+    python\python.exe -m pip install https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1+cu128torch2.7.0cxx11abiFALSE-cp312-cp312-win_amd64.whl --no-warn-script-location
     if errorlevel 1 (
         echo ⚠️ Не удалось установить Flash Attention 2. Приложение будет работать медленнее.
         echo Можно установить вручную позже.
