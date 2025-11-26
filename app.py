@@ -83,6 +83,31 @@ class LogCapture:
 log_capture = LogCapture()
 
 # ==========================================
+# Thinking Models Utilities
+# ==========================================
+def parse_thinking_output(text: str) -> Tuple[str, str]:
+    """
+    Parse thinking model output to separate reasoning from final answer
+
+    Returns:
+        Tuple of (reasoning, final_answer)
+        If no </think> tag found, returns ("", full_text)
+    """
+    # Check for </think> tag
+    if '</think>' in text:
+        parts = text.split('</think>', 1)
+        if len(parts) == 2:
+            reasoning = parts[0].strip()
+            # Remove <think> tag if present at start
+            if reasoning.startswith('<think>'):
+                reasoning = reasoning[7:].strip()
+            final_answer = parts[1].strip()
+            return reasoning, final_answer
+
+    # No thinking tag found
+    return "", text
+
+# ==========================================
 # Visual Grounding Utilities
 # ==========================================
 def parse_bboxes_from_text(text: str) -> list:
@@ -1752,9 +1777,19 @@ def process_single_image(
         elapsed_time = time.time() - start_time
         memory_info = get_memory_info()
 
-        # Check for bounding boxes in results and log them
+        # Check for thinking output and bounding boxes in results
         total_bboxes = 0
+        has_thinking = False
         for i, result in enumerate(results):
+            # Check for thinking output
+            reasoning, final_answer = parse_thinking_output(result)
+            if reasoning:
+                has_thinking = True
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💭 Variant {i+1}: Thinking model detected")
+                print(f"  Reasoning length: {len(reasoning)} chars")
+                print(f"  Answer length: {len(final_answer)} chars")
+
+            # Check for bounding boxes
             bboxes = parse_bboxes_from_text(result)
             if bboxes:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Variant {i+1}: Found {len(bboxes)} bounding boxes")
@@ -1766,8 +1801,9 @@ def process_single_image(
 
         # Build detailed status with per-variant timing
         timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
+        thinking_info = " | 💭 Thinking" if has_thinking else ""
         bbox_info = f" | 📍 {total_bboxes} bbox" if total_bboxes > 0 else ""
-        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){bbox_info} | {memory_info}"
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){thinking_info}{bbox_info} | {memory_info}"
 
         # Prepare download file
         download_path = None
@@ -1934,9 +1970,19 @@ def process_multi_image(
         elapsed_time = time.time() - start_time
         memory_info = get_memory_info()
 
-        # Check for bounding boxes in results and log them
+        # Check for thinking output and bounding boxes in results
         total_bboxes = 0
+        has_thinking = False
         for i, result in enumerate(results):
+            # Check for thinking output
+            reasoning, final_answer = parse_thinking_output(result)
+            if reasoning:
+                has_thinking = True
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💭 Variant {i+1}: Thinking model detected")
+                print(f"  Reasoning length: {len(reasoning)} chars")
+                print(f"  Answer length: {len(final_answer)} chars")
+
+            # Check for bounding boxes
             bboxes = parse_bboxes_from_text(result)
             if bboxes:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Variant {i+1}: Found {len(bboxes)} bounding boxes")
@@ -1948,8 +1994,9 @@ def process_multi_image(
 
         # Build detailed status with per-variant timing
         timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
+        thinking_info = " | 💭 Thinking" if has_thinking else ""
         bbox_info = f" | 📍 {total_bboxes} bbox" if total_bboxes > 0 else ""
-        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){bbox_info} | {memory_info}"
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){thinking_info}{bbox_info} | {memory_info}"
 
         # Prepare download file
         download_path = None
