@@ -2,13 +2,15 @@ import gradio as gr
 import torch
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor, BitsAndBytesConfig, TextIteratorStreamer
 from qwen_vl_utils import process_vision_info
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import random
 import os
 import warnings
 from typing import List, Tuple, Optional, Generator
 import gc
 import json
+import re
+import ast
 import csv
 import shutil
 from datetime import datetime
@@ -79,6 +81,134 @@ class LogCapture:
 
 # Global log capture instance
 log_capture = LogCapture()
+
+# ==========================================
+# Visual Grounding Utilities
+# ==========================================
+def parse_bboxes_from_text(text: str) -> list:
+    """
+    Parse bounding boxes from model output text
+    Supports multiple formats:
+    1. JSON format: [{"bbox_2d": [x1, y1, x2, y2], "label": "..."}]
+    2. Inline format: {"bbox_2d": [x1, y1, x2, y2], "label": "..."}
+    """
+    bboxes = []
+
+    # Try JSON format first
+    try:
+        # Extract JSON from markdown code block if present
+        if '```json' in text:
+            json_str = text.split('```json')[1].split('```')[0].strip()
+        elif '```' in text:
+            json_str = text.split('```')[1].split('```')[0].strip()
+        else:
+            # Try to find JSON array directly
+            start = text.find('[')
+            end = text.rfind(']') + 1
+            if start >= 0 and end > start:
+                json_str = text[start:end]
+            else:
+                # Try single object
+                start = text.find('{')
+                end = text.rfind('}') + 1
+                if start >= 0 and end > start:
+                    json_str = '[' + text[start:end] + ']'
+                else:
+                    return []
+
+        parsed = json.loads(json_str)
+        if isinstance(parsed, list):
+            bboxes = parsed
+        elif isinstance(parsed, dict):
+            bboxes = [parsed]
+    except (json.JSONDecodeError, ValueError, IndexError):
+        # Try ast.literal_eval as fallback
+        try:
+            # Find all dict-like patterns
+            pattern = r'\{[^{}]*"bbox_2d"[^{}]*\}'
+            matches = re.findall(pattern, text, re.DOTALL)
+            for match in matches:
+                try:
+                    bbox_dict = ast.literal_eval(match)
+                    if 'bbox_2d' in bbox_dict:
+                        bboxes.append(bbox_dict)
+                except:
+                    pass
+        except:
+            pass
+
+    return bboxes
+
+def draw_bboxes_on_image(image_path: str, bboxes: list, output_path: str = None, normalized: bool = True) -> str:
+    """
+    Draw bounding boxes on image
+
+    Args:
+        image_path: path to image file
+        bboxes: list of bbox dicts with 'bbox_2d' and 'label' keys
+        output_path: optional path to save the result (if None, creates temp file)
+        normalized: if True, bboxes are in [0,1000] range; if False, pixel coords
+
+    Returns:
+        Path to output image with drawn boxes
+    """
+    if not bboxes:
+        return image_path
+
+    # Load image
+    img = Image.open(image_path)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    draw = ImageDraw.Draw(img)
+    img_width, img_height = img.size
+
+    # Try to load a font, fallback to default if not available
+    try:
+        font = ImageFont.truetype("arial.ttf", 16)
+    except:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+        except:
+            font = ImageFont.load_default()
+
+    # Draw each bounding box
+    for bbox_item in bboxes:
+        bbox = bbox_item.get('bbox_2d', [])
+        label = bbox_item.get('label', 'unknown')
+
+        if len(bbox) != 4:
+            continue
+
+        x1, y1, x2, y2 = bbox
+
+        # Convert from normalized to pixel coordinates if needed
+        if normalized:
+            x1 = int(x1 / 1000 * img_width)
+            y1 = int(y1 / 1000 * img_height)
+            x2 = int(x2 / 1000 * img_width)
+            y2 = int(y2 / 1000 * img_height)
+        else:
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+        # Draw rectangle
+        draw.rectangle([x1, y1, x2, y2], outline='red', width=3)
+
+        # Draw label background
+        try:
+            bbox_text = draw.textbbox((x1, y1 - 20), label, font=font)
+            draw.rectangle(bbox_text, fill='red')
+            draw.text((x1, y1 - 20), label, fill='white', font=font)
+        except:
+            # Fallback without textbbox if not available
+            draw.text((x1, y1 - 20), label, fill='red', font=font)
+
+    # Save result
+    if output_path is None:
+        output_path = os.path.join(TEMP_DIR, f"bbox_{os.path.basename(image_path)}")
+
+    img.save(output_path)
+    return output_path
 
 # Base directory for portable app
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -516,6 +646,9 @@ DESCRIPTION_TYPES = {
         "🔀 Before/After comparison": "Analyze the before (first image) and after (last image) states: 1) What changed? 2) Quantify improvements if measurable, 3) Rate the transformation quality 1-10, 4) What could be improved further?",
         "🔀 Time-series analysis": "These images show a sequence over time. Describe: 1) progression and trends, 2) identify causality between frames, 3) predict what happens next, 4) rate of change (fast/slow/accelerating), 5) any anomalies.",
         "🔀 Quality control": "Review these quality control images: 1) identify defects in each, 2) classify defect types, 3) rate pass/fail for each, 4) percentage meeting standards, 5) recommend corrective actions, 6) any systematic issues?",
+        "📍 Detect objects with locations": "Detect all objects in the image and return their locations in the format: {\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"object_name\"}",
+        "📍 Visual grounding": "Describe the image in detail with grounding. For each important object, provide bounding box coordinates.",
+        "📍 Find and locate": "Find all instances of specific objects and provide their precise locations with bounding boxes in JSON format.",
         "Custom": ""
     },
     "ru": {
@@ -536,6 +669,9 @@ DESCRIPTION_TYPES = {
         "🔀 Сравнение до/после": "Проанализируй состояния до (первое изображение) и после (последнее): 1) Что изменилось? 2) Количественно оцени улучшения, 3) Оцени качество преобразования 1-10, 4) Что можно улучшить?",
         "🔀 Анализ временного ряда": "Эти изображения показывают последовательность во времени. Опиши: 1) развитие и тренды, 2) причинность между кадрами, 3) предскажи что будет дальше, 4) скорость изменений, 5) аномалии.",
         "🔀 Контроль качества": "Проверь эти изображения контроля качества: 1) дефекты в каждом, 2) типы дефектов, 3) сдача/отказ для каждого, 4) процент соответствия стандартам, 5) корректирующие действия, 6) системные проблемы?",
+        "📍 Обнаружить объекты с местоположением": "Обнаружь все объекты на изображении и верни их местоположение в формате: {\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"название_объекта\"}",
+        "📍 Визуальная привязка": "Опиши изображение подробно с привязкой. Для каждого важного объекта укажи координаты ограничивающей рамки.",
+        "📍 Найти и указать местоположение": "Найди все экземпляры конкретных объектов и укажи их точные местоположения с ограничивающими рамками в JSON формате.",
         "Свой промпт": ""
     },
     "zh": {
@@ -556,6 +692,9 @@ DESCRIPTION_TYPES = {
         "🔀 前后对比": "分析之前（第一张图）和之后（最后一张）的状态：1）发生了什么变化？2）量化改进（如可衡量），3）转换质量评分1-10，4）还可以改进什么？",
         "🔀 时间序列分析": "这些图像显示时间序列。描述：1）进度和趋势，2）识别帧之间的因果关系，3）预测接下来会发生什么，4）变化速率（快/慢/加速），5）任何异常。",
         "🔀 质量控制": "审查这些质量控制图像：1）识别每个缺陷，2）分类缺陷类型，3）对每个评分合格/不合格，4）符合标准的百分比，5）推荐纠正措施，6）是否有系统性问题？",
+        "📍 检测对象及位置": "检测图像中的所有对象并以格式返回其位置：{\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"对象名称\"}",
+        "📍 视觉定位": "详细描述图像并提供定位。对于每个重要对象，提供边界框坐标。",
+        "📍 查找并定位": "查找特定对象的所有实例，并以JSON格式提供其精确位置和边界框。",
         "自定义": ""
     }
 }
@@ -1613,9 +1752,22 @@ def process_single_image(
         elapsed_time = time.time() - start_time
         memory_info = get_memory_info()
 
+        # Check for bounding boxes in results and log them
+        total_bboxes = 0
+        for i, result in enumerate(results):
+            bboxes = parse_bboxes_from_text(result)
+            if bboxes:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Variant {i+1}: Found {len(bboxes)} bounding boxes")
+                for j, bbox in enumerate(bboxes):
+                    label = bbox.get('label', 'unknown')
+                    coords = bbox.get('bbox_2d', [])
+                    print(f"  - Object {j+1}: {label} at {coords}")
+                total_bboxes += len(bboxes)
+
         # Build detailed status with per-variant timing
         timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
-        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}) | {memory_info}"
+        bbox_info = f" | 📍 {total_bboxes} bbox" if total_bboxes > 0 else ""
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){bbox_info} | {memory_info}"
 
         # Prepare download file
         download_path = None
@@ -1782,9 +1934,22 @@ def process_multi_image(
         elapsed_time = time.time() - start_time
         memory_info = get_memory_info()
 
+        # Check for bounding boxes in results and log them
+        total_bboxes = 0
+        for i, result in enumerate(results):
+            bboxes = parse_bboxes_from_text(result)
+            if bboxes:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Variant {i+1}: Found {len(bboxes)} bounding boxes")
+                for j, bbox in enumerate(bboxes):
+                    label = bbox.get('label', 'unknown')
+                    coords = bbox.get('bbox_2d', [])
+                    print(f"  - Object {j+1}: {label} at {coords}")
+                total_bboxes += len(bboxes)
+
         # Build detailed status with per-variant timing
         timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
-        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}) | {memory_info}"
+        bbox_info = f" | 📍 {total_bboxes} bbox" if total_bboxes > 0 else ""
+        final_status = f"{get_text('generation_complete')} | Total: {elapsed_time:.1f}s ({timing_details}){bbox_info} | {memory_info}"
 
         # Prepare download file
         download_path = None
