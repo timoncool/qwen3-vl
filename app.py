@@ -1672,7 +1672,7 @@ def process_single_image(
 
     # Check if we have either uploaded image or video
     if image is None and video is None:
-        yield get_text("error_no_image"), "", [], None, log_capture.get_logs()
+        yield get_text("error_no_image"), "", [], None, log_capture.get_logs(), "", None
         return
 
     # Determine if processing video
@@ -1686,7 +1686,7 @@ def process_single_image(
         is_video=is_video
     )
     if not final_prompt.strip():
-        yield get_text("error_no_prompt"), "", [], None, log_capture.get_logs()
+        yield get_text("error_no_prompt"), "", [], None, log_capture.get_logs(), "", None
         return
 
     temp_path = None
@@ -1719,7 +1719,7 @@ def process_single_image(
             if stop_generation_flag:
                 elapsed_time = time.time() - start_time
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация остановлена пользователем")
-                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs()
+                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs(), "", None
                 return
 
             variant_start = time.time()
@@ -1936,7 +1936,7 @@ def process_multi_image(
             if stop_generation_flag:
                 elapsed_time = time.time() - start_time
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация остановлена пользователем")
-                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs()
+                yield f"🛑 {get_text('generation_stopped')} ({get_text('processing_time')}: {elapsed_time:.1f} {get_text('seconds')})", final_prompt, results, None, log_capture.get_logs(), "", None
                 return
 
             variant_start = time.time()
