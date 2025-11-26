@@ -1709,7 +1709,10 @@ def process_single_image(
             is_video = False
 
         results = []
+        full_results = []  # Store full results before parsing
+        reasoning_list = []  # Store reasoning from thinking models
         variant_times = []  # Track time for each variant
+        image_preview_path = None  # Path to image with bboxes drawn
 
         for i in range(num_variants):
             # Check stop flag
@@ -1747,12 +1750,12 @@ def process_single_image(
                     current_result = partial_result
                     # Update results with streaming text
                     temp_results = results + [current_result]
-                    yield status_msg, final_prompt, temp_results, None, log_capture.get_logs()
+                    yield status_msg, final_prompt, temp_results, None, log_capture.get_logs(), "", None
 
                 result = current_result
             else:
                 # Non-streaming generation
-                yield status_msg, final_prompt, results, None, log_capture.get_logs()
+                yield status_msg, final_prompt, results, None, log_capture.get_logs(), "", None
                 result = generator.generate_description(
                     image_path=media_path,
                     prompt=final_prompt,
@@ -1770,7 +1773,15 @@ def process_single_image(
 
             variant_time = time.time() - variant_start
             variant_times.append(variant_time)
-            results.append(result)
+
+            # Store full result before parsing
+            full_results.append(result)
+
+            # Parse thinking output if present
+            reasoning, final_answer = parse_thinking_output(result)
+            reasoning_list.append(reasoning)  # Store reasoning (empty string if no thinking)
+            results.append(final_answer)  # Store only final answer in results
+
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Вариант {i+1} завершен за {variant_time:.1f}s")
 
         # Calculate processing time
@@ -1779,18 +1790,18 @@ def process_single_image(
 
         # Check for thinking output and bounding boxes in results
         total_bboxes = 0
-        has_thinking = False
-        for i, result in enumerate(results):
-            # Check for thinking output
-            reasoning, final_answer = parse_thinking_output(result)
-            if reasoning:
-                has_thinking = True
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💭 Variant {i+1}: Thinking model detected")
-                print(f"  Reasoning length: {len(reasoning)} chars")
-                print(f"  Answer length: {len(final_answer)} chars")
+        has_thinking = any(r for r in reasoning_list if r)  # Check if any reasoning exists
+        first_bbox_result = None
 
-            # Check for bounding boxes
-            bboxes = parse_bboxes_from_text(result)
+        for i, full_result in enumerate(full_results):
+            # Log thinking if present
+            if reasoning_list[i]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💭 Variant {i+1}: Thinking model detected")
+                print(f"  Reasoning length: {len(reasoning_list[i])} chars")
+                print(f"  Answer length: {len(results[i])} chars")
+
+            # Check for bounding boxes in full result
+            bboxes = parse_bboxes_from_text(full_result)
             if bboxes:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Variant {i+1}: Found {len(bboxes)} bounding boxes")
                 for j, bbox in enumerate(bboxes):
@@ -1798,6 +1809,15 @@ def process_single_image(
                     coords = bbox.get('bbox_2d', [])
                     print(f"  - Object {j+1}: {label} at {coords}")
                 total_bboxes += len(bboxes)
+
+                # Draw bboxes on image for first variant with bboxes
+                if first_bbox_result is None and not is_video and media_path:
+                    try:
+                        image_preview_path = draw_bboxes_on_image(media_path, bboxes, normalized=True)
+                        first_bbox_result = i
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Drew {len(bboxes)} bboxes on image: {image_preview_path}")
+                    except Exception as e:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Failed to draw bboxes: {e}")
 
         # Build detailed status with per-variant timing
         timing_details = " | ".join([f"V{i+1}: {t:.1f}s" for i, t in enumerate(variant_times)])
@@ -1811,12 +1831,15 @@ def process_single_image(
             all_text = "\n\n".join([f"=== Variant {i+1} (Time: {variant_times[i]:.1f}s) ===\n{r}" for i, r in enumerate(results)])
             download_path = save_text_to_file(all_text, f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
 
+        # Get first reasoning (or empty string)
+        first_reasoning = reasoning_list[0] if reasoning_list and reasoning_list[0] else ""
+
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Генерация завершена успешно за {elapsed_time:.1f}s")
-        yield final_status, final_prompt, results, download_path, log_capture.get_logs()
+        yield final_status, final_prompt, results, download_path, log_capture.get_logs(), first_reasoning, image_preview_path
 
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Ошибка: {str(e)}")
-        yield f"❌ Error: {str(e)}", final_prompt, [], None, log_capture.get_logs()
+        yield f"❌ Error: {str(e)}", final_prompt, [], None, log_capture.get_logs(), "", None
     finally:
         # Stop capturing console output
         log_capture.stop_capture()
@@ -2515,11 +2538,31 @@ def create_interface():
                             interactive=False,
                             elem_classes="status-box"
                         )
+
+                        # Thinking Process section (collapsible)
+                        with gr.Accordion("💭 Мыслительный процесс", open=True, visible=True) as thinking_accordion:
+                            thinking_output = gr.Textbox(
+                                label="",
+                                lines=6,
+                                interactive=False,
+                                show_copy_button=True,
+                                placeholder="Здесь будет отображаться процесс рассуждения модели (для Thinking моделей)..."
+                            )
+
                         single_prompt_used = gr.Textbox(
                             label="Использованный промпт",
                             interactive=False,
                             lines=2
                         )
+
+                        # Image preview with bboxes
+                        with gr.Accordion("🖼️ Превью изображения", open=True, visible=True) as image_preview_accordion:
+                            image_preview = gr.Image(
+                                label="",
+                                type="filepath",
+                                interactive=False,
+                                show_label=False
+                            )
 
                         # Multiple variant outputs
                         single_outputs = []
@@ -2993,14 +3036,22 @@ def create_interface():
                 gr.update(interactive=True),   # single_stop_btn_image
                 gr.update(interactive=True),   # single_stop_btn_video
                 gr.update(interactive=True),   # single_stop_btn_multi
-                "", "", *[gr.update(value="") for _ in range(5)], None, ""
+                "",  # single_status
+                gr.update(visible=False),  # thinking_accordion
+                "",  # thinking_output
+                "",  # single_prompt_used
+                gr.update(visible=False),  # image_preview_accordion
+                None,  # image_preview
+                *[gr.update(value="") for _ in range(5)],  # variant outputs
+                None,  # single_download
+                ""  # single_console_output
             )
 
             results = []
             download_path = None
 
             # Process and yield results
-            for status, prompt_used, results, download_path, console_logs in process_single_image(
+            for status, prompt_used, results, download_path, console_logs, reasoning, image_preview in process_single_image(
                 image, video, video_start_time, video_end_time, desc_type, desc_length, custom_prompt,
                 extra_options, character_name, num_variants,
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed
@@ -3018,6 +3069,10 @@ def create_interface():
                 size_str = f" [{cached_size}]" if cached_size else ""
                 status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
 
+                # Update thinking and image preview visibility
+                thinking_visible = bool(reasoning)
+                image_preview_visible = bool(image_preview)
+
                 # Keep buttons disabled during generation
                 yield (
                     gr.update(value=get_text("generating"), interactive=False),  # single_submit_btn
@@ -3028,7 +3083,15 @@ def create_interface():
                     gr.update(interactive=True),   # single_stop_btn_image
                     gr.update(interactive=True),   # single_stop_btn_video
                     gr.update(interactive=True),   # single_stop_btn_multi
-                    status_with_model, prompt_used, *variant_outputs, download_path, console_logs
+                    status_with_model,  # single_status
+                    gr.update(visible=thinking_visible),  # thinking_accordion
+                    reasoning if reasoning else "",  # thinking_output
+                    prompt_used,  # single_prompt_used
+                    gr.update(visible=image_preview_visible),  # image_preview_accordion
+                    image_preview,  # image_preview
+                    *variant_outputs,  # variant outputs
+                    download_path,  # single_download
+                    console_logs  # single_console_output
                 )
 
             # Stop capturing and get final logs
@@ -3048,6 +3111,10 @@ def create_interface():
             size_str = f" [{cached_size}]" if cached_size else ""
             final_status_with_model = f"✅ **{model_name}**{size_str} | {quantization}\n\n{status}"
 
+            # Update final thinking and image preview visibility
+            final_thinking_visible = bool(reasoning)
+            final_image_preview_visible = bool(image_preview)
+
             # Re-enable all generate buttons, disable all stop buttons
             yield (
                 gr.update(value=get_text("generate_btn"), interactive=True),  # single_submit_btn
@@ -3058,7 +3125,15 @@ def create_interface():
                 gr.update(interactive=False),  # single_stop_btn_image
                 gr.update(interactive=False),  # single_stop_btn_video
                 gr.update(interactive=False),  # single_stop_btn_multi
-                final_status_with_model, prompt_used, *final_outputs, download_path, final_logs
+                final_status_with_model,  # single_status
+                gr.update(visible=final_thinking_visible),  # thinking_accordion
+                reasoning if reasoning else "",  # thinking_output
+                prompt_used,  # single_prompt_used
+                gr.update(visible=final_image_preview_visible),  # image_preview_accordion
+                image_preview,  # image_preview
+                *final_outputs,  # variant outputs
+                download_path,  # single_download
+                final_logs  # single_console_output
             )
 
         single_submit_btn.click(
@@ -3082,7 +3157,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, thinking_accordion, thinking_output, single_prompt_used, image_preview_accordion, image_preview] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         # Duplicate Generate buttons in Image/Video tabs - same functionality
@@ -3107,7 +3182,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, thinking_accordion, thinking_output, single_prompt_used, image_preview_accordion, image_preview] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         single_generate_btn_video.click(
@@ -3131,7 +3206,7 @@ def create_interface():
                 top_k_slider,
                 seed_number
             ],
-            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+            outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi, single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi, single_status, thinking_accordion, thinking_output, single_prompt_used, image_preview_accordion, image_preview] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         # Duplicate Stop buttons in Image/Video tabs
@@ -3163,7 +3238,15 @@ def create_interface():
                 gr.update(interactive=True),   # single_stop_btn_image
                 gr.update(interactive=True),   # single_stop_btn_video
                 gr.update(interactive=True),   # single_stop_btn_multi
-                "", "", *[gr.update(value="") for _ in range(5)], None, ""
+                "",  # single_status
+                gr.update(visible=False),  # thinking_accordion
+                "",  # thinking_output
+                "",  # single_prompt_used
+                gr.update(visible=False),  # image_preview_accordion
+                None,  # image_preview
+                *[gr.update(value="") for _ in range(5)],  # variant outputs
+                None,  # single_download
+                ""  # single_console_output
             )
 
             results = []
@@ -3198,7 +3281,15 @@ def create_interface():
                     gr.update(interactive=True),
                     gr.update(interactive=True),
                     gr.update(interactive=True),
-                    status_with_model, prompt_used, *variant_outputs, download_path, console_logs
+                    status_with_model,  # single_status
+                    gr.update(visible=False),  # thinking_accordion
+                    "",  # thinking_output
+                    prompt_used,  # single_prompt_used
+                    gr.update(visible=False),  # image_preview_accordion
+                    None,  # image_preview
+                    *variant_outputs,  # variant outputs
+                    download_path,  # single_download
+                    console_logs  # single_console_output
                 )
 
             # Stop capturing and get final logs
@@ -3228,7 +3319,15 @@ def create_interface():
                 gr.update(interactive=False),
                 gr.update(interactive=False),
                 gr.update(interactive=False),
-                final_status_with_model, prompt_used, *final_outputs, download_path, final_logs
+                final_status_with_model,  # single_status
+                gr.update(visible=False),  # thinking_accordion
+                "",  # thinking_output
+                prompt_used,  # single_prompt_used
+                gr.update(visible=False),  # image_preview_accordion
+                None,  # image_preview
+                *final_outputs,  # variant outputs
+                download_path,  # single_download
+                final_logs  # single_console_output
             )
 
         # Wire up multi-image generate button
@@ -3252,7 +3351,7 @@ def create_interface():
             ],
             outputs=[single_submit_btn, single_generate_btn_image, single_generate_btn_video, single_generate_btn_multi,
                      single_stop_btn, single_stop_btn_image, single_stop_btn_video, single_stop_btn_multi,
-                     single_status, single_prompt_used] + [output for _, output in single_outputs] + [single_download, single_console_output]
+                     single_status, thinking_accordion, thinking_output, single_prompt_used, image_preview_accordion, image_preview] + [output for _, output in single_outputs] + [single_download, single_console_output]
         )
 
         # Wire up multi-image stop button
