@@ -151,7 +151,7 @@ def get_model_cache_size(model_id: str) -> Optional[str]:
 
 # Available models (without MOE models which have different architecture)
 AVAILABLE_MODELS = [
-    # Abliterated models (без цензуры) - рекомендуемые
+    # Abliterated models (без цензуры)
     ("2B Instruct Abliterated", "huihui-ai/Huihui-Qwen3-VL-2B-Instruct-abliterated"),
     ("2B Thinking Abliterated", "huihui-ai/Huihui-Qwen3-VL-2B-Thinking-abliterated"),
     ("4B Instruct Abliterated", "huihui-ai/Huihui-Qwen3-VL-4B-Instruct-abliterated"),
@@ -160,10 +160,6 @@ AVAILABLE_MODELS = [
     ("8B Thinking Abliterated", "huihui-ai/Huihui-Qwen3-VL-8B-Thinking-abliterated"),
     ("32B Instruct Abliterated", "huihui-ai/Huihui-Qwen3-VL-32B-Instruct-abliterated"),
     ("32B Thinking Abliterated", "huihui-ai/Huihui-Qwen3-VL-32B-Thinking-abliterated"),
-    # Original Qwen models
-    ("Qwen 2B Instruct", "Qwen/Qwen3-VL-2B-Instruct"),
-    ("Qwen 4B Instruct", "Qwen/Qwen3-VL-4B-Instruct"),
-    ("Qwen 8B Instruct", "Qwen/Qwen3-VL-8B-Instruct"),
 ]
 
 def get_model_choices():
