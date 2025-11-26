@@ -674,6 +674,32 @@ DESCRIPTION_TYPES = {
         "📍 Detect objects with locations": "Detect all objects in the image and return their locations in the format: {\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"object_name\"}",
         "📍 Visual grounding": "Describe the image in detail with grounding. For each important object, provide bounding box coordinates.",
         "📍 Find and locate": "Find all instances of specific objects and provide their precise locations with bounding boxes in JSON format.",
+        "🧠 Math step-by-step": "Solve the mathematical problem in the image. Think carefully step by step. Step 1: Identify the data. Step 2: Calculate. Step 3: Verify the answer.",
+        "🧠 Logical analysis": "Analyze the image step by step: 1) Identify the main subject, 2) Describe background and context, 3) Note important details, 4) Explain the overall scene and atmosphere.",
+        "🧠 Causal analysis": "Examine the sequence and explain: 1) What happened first? 2) What caused the change? 3) What was the effect? 4) What will likely happen next? Provide reasoning for each step.",
+        "📊 Chart analysis": "You are an expert in visual analytics. Analyze the chart: 1) Chart type, 2) Title and axes, 3) Key trends, 4) Conclusions and insights.",
+        "📊 Data visualization": "Analyze this data visualization: identify the type, extract data points, describe trends, and provide key insights with specific numbers.",
+        "🩺 Medical image analysis": "Analyze this medical image. Identify visible structures and note any abnormalities. Use medical terminology where appropriate.",
+        "⚙️ Technical diagram": "This is a technical diagram. Identify all components, explain their functions, and describe how they interact with each other.",
+        "📄 Document extraction": "Extract structured data from the document without omissions. Return JSON with keys: document_type, date, number, items (array), total.",
+        "🔬 Scientific image": "Analyze this scientific image. Describe observed phenomena, structures, and processes. Use scientific terminology.",
+        "🎬 Timeline of events": "Describe the chronological sequence of events in the video with timestamps. What happens at each key moment?",
+        "🎬 Action detection": "Identify all instances where [action] occurs in the video and provide approximate timestamps.",
+        "🎬 Long video summary": "This is a [X]-minute video. Summarize the main topics and key points covered.",
+        "🎬 Editing analysis": "Analyze the video editing: shot types, pacing, transitions, background music (if instruments/actions are visible).",
+        "📚 Explain concept": "Explain the concept shown in the image in simple language. How does it work and why is it important?",
+        "📚 Solve textbook problem": "Solve this textbook problem step by step. Show all calculations and explain the logic.",
+        "📚 Historical analysis": "Analyze this historical photo/document: period, context, significance, visible details of the era.",
+        "📚 Lab setup": "Describe the laboratory setup: equipment, procedure, safety measures.",
+        "🎨 Color analysis": "Detailed color palette analysis: dominant colors, contrasts, harmony, color mood, application in design.",
+        "🏗️ Architectural analysis": "Architecture analysis: style, period, structural elements, materials, functionality, cultural significance.",
+        "🍽️ Dish analysis": "As a chef, describe the dish: ingredients, cooking technique, presentation, flavor combination, serving recommendations.",
+        "💼 Presentation slide": "Describe the presentation slide content: title, key points, visual elements, main message.",
+        "🏭 Industrial safety": "Analyze the image for safety: identified risks, violations, recommendations.",
+        "🎯 Layered composition": "Analyze the scene in layers: Layer 1: Background, Layer 2: Middle ground, Layer 3: Foreground, Layer 4: Overall composition and visual flow.",
+        "🎯 Spatial analysis": "Describe spatial arrangement: overall layout, foreground/middle/background, object relationships, perspective.",
+        "🤔 Careful analysis": "Before answering, first carefully observe the image. Then, organize your thoughts about what's important. Finally, provide a structured response covering: subject, context, details, and interpretation.",
+        "🤔 Problem-finding": "Examine the image critically. What works well? What could be improved? Provide specific recommendations.",
         "Custom": ""
     },
     "ru": {
@@ -697,6 +723,32 @@ DESCRIPTION_TYPES = {
         "📍 Обнаружить объекты с местоположением": "Обнаружь все объекты на изображении и верни их местоположение в формате: {\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"название_объекта\"}",
         "📍 Визуальная привязка": "Опиши изображение подробно с привязкой. Для каждого важного объекта укажи координаты ограничивающей рамки.",
         "📍 Найти и указать местоположение": "Найди все экземпляры конкретных объектов и укажи их точные местоположения с ограничивающими рамками в JSON формате.",
+        "🧠 Математика пошагово": "Реши математическую задачу на изображении. Думай последовательно шаг за шагом. Шаг 1: Определи данные. Шаг 2: Вычисли. Шаг 3: Проверь ответ.",
+        "🧠 Логический анализ": "Проанализируй изображение пошагово: 1) Определи главный объект, 2) Опиши фон и контекст, 3) Отметь важные детали, 4) Объясни общую сцену и атмосферу.",
+        "🧠 Причинно-следственный анализ": "Изучи последовательность и объясни: 1) Что произошло сначала? 2) Что вызвало изменение? 3) Каков эффект? 4) Что произойдет дальше? Обоснуй каждый шаг.",
+        "📊 Анализ графиков": "Ты эксперт по визуальной аналитике. Проанализируй график: 1) Тип графика, 2) Заголовок и оси, 3) Ключевые тренды, 4) Выводы и инсайты.",
+        "📊 Визуализация данных": "Проанализируй эту визуализацию данных: определи тип, извлеки точки данных, опиши тренды и дай ключевые инсайты с конкретными числами.",
+        "🩺 Медицинское изображение": "Проанализируй медицинское изображение. Определи видимые структуры и отметь любые аномалии. Используй медицинскую терминологию.",
+        "⚙️ Техническая диаграмма": "Это техническая диаграмма. Определи все компоненты, объясни их функции и опиши как они взаимодействуют.",
+        "📄 Извлечение из документа": "Извлеки структурированные данные из документа без пропусков. Верни JSON с ключами: тип_документа, дата, номер, позиции (массив), итого.",
+        "🔬 Научное изображение": "Проанализируй научное изображение. Опиши наблюдаемые явления, структуры и процессы. Используй научную терминологию.",
+        "🎬 Временная шкала событий": "Опиши хронологическую последовательность событий в видео с временными метками. Что происходит в каждый ключевой момент?",
+        "🎬 Обнаружение действий": "Определи все моменты, когда [действие] происходит в видео, и укажи примерные временные метки.",
+        "🎬 Резюме длинного видео": "Это [X]-минутное видео. Резюмируй основные темы и ключевые моменты.",
+        "🎬 Анализ монтажа": "Проанализируй монтаж видео: типы планов, темп, переходы, музыкальное сопровождение (если видно инструменты/действия).",
+        "📚 Объясни концепцию": "Объясни концепцию, показанную на изображении, простым языком. Как это работает и почему это важно?",
+        "📚 Решение задачи из учебника": "Реши эту задачу из учебника пошагово. Покажи все вычисления и объясни логику.",
+        "📚 Исторический анализ": "Проанализируй это историческое фото/документ: период, контекст, значимость, видимые детали эпохи.",
+        "📚 Лабораторная работа": "Опиши лабораторную установку: оборудование, процедуру, меры безопасности.",
+        "🎨 Цветовой анализ": "Детальный анализ цветовой палитры: доминирующие цвета, контрасты, гармония, настроение цвета, применение в дизайне.",
+        "🏗️ Архитектурный анализ": "Анализ архитектуры: стиль, период, конструктивные элементы, материалы, функциональность, культурное значение.",
+        "🍽️ Анализ блюда": "Как шеф-повар опиши блюдо: ингредиенты, техника приготовления, подача, сочетание вкусов, рекомендации к подаче.",
+        "💼 Презентация/Слайд": "Опиши содержание слайда презентации: заголовок, ключевые пункты, визуальные элементы, основная мысль.",
+        "🏭 Промышленная безопасность": "Проанализируй изображение на предмет безопасности: выявленные риски, нарушения, рекомендации.",
+        "🎯 Анализ композиции по слоям": "Анализируй сцену послойно: Слой 1: Фон, Слой 2: Средний план, Слой 3: Передний план, Слой 4: Композиция и поток взгляда.",
+        "🎯 Пространственный анализ": "Опиши пространственное расположение: общая компоновка, передний/средний/задний план, взаимоотношения объектов, перспектива.",
+        "🤔 Внимательный анализ": "Перед ответом сначала внимательно изучи изображение. Затем организуй свои мысли о важном. Наконец, дай структурированный ответ: предмет, контекст, детали, интерпретация.",
+        "🤔 Поиск проблем": "Изучи изображение критически. Что работает хорошо? Что можно улучшить? Предложи конкретные рекомендации.",
         "Свой промпт": ""
     },
     "zh": {
@@ -720,6 +772,32 @@ DESCRIPTION_TYPES = {
         "📍 检测对象及位置": "检测图像中的所有对象并以格式返回其位置：{\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"对象名称\"}",
         "📍 视觉定位": "详细描述图像并提供定位。对于每个重要对象，提供边界框坐标。",
         "📍 查找并定位": "查找特定对象的所有实例，并以JSON格式提供其精确位置和边界框。",
+        "🧠 逐步数学": "解决图像中的数学问题。逐步仔细思考。步骤1：识别数据。步骤2：计算。步骤3：验证答案。",
+        "🧠 逻辑分析": "逐步分析图像：1）识别主要对象，2）描述背景和上下文，3）注意重要细节，4）解释整体场景和氛围。",
+        "🧠 因果分析": "检查序列并解释：1）首先发生了什么？2）什么导致了变化？3）效果是什么？4）接下来可能发生什么？为每个步骤提供推理。",
+        "📊 图表分析": "你是视觉分析专家。分析图表：1）图表类型，2）标题和坐标轴，3）关键趋势，4）结论和见解。",
+        "📊 数据可视化": "分析这个数据可视化：识别类型，提取数据点，描述趋势，并提供具体数字的关键见解。",
+        "🩺 医学图像分析": "分析这张医学图像。识别可见结构并注意任何异常。适当使用医学术语。",
+        "⚙️ 技术图表": "这是技术图表。识别所有组件，解释其功能，并描述它们如何相互作用。",
+        "📄 文档提取": "从文档中提取结构化数据而不遗漏。返回JSON，键：document_type、date、number、items（数组）、total。",
+        "🔬 科学图像": "分析这张科学图像。描述观察到的现象、结构和过程。使用科学术语。",
+        "🎬 事件时间线": "描述视频中事件的时间顺序和时间戳。每个关键时刻发生了什么？",
+        "🎬 动作检测": "识别视频中发生[动作]的所有实例，并提供大致时间戳。",
+        "🎬 长视频摘要": "这是一个[X]分钟的视频。总结涵盖的主要主题和要点。",
+        "🎬 剪辑分析": "分析视频剪辑：镜头类型、节奏、转场、背景音乐（如果可见乐器/动作）。",
+        "📚 解释概念": "用简单的语言解释图像中显示的概念。它是如何工作的，为什么重要？",
+        "📚 解决教科书问题": "逐步解决这个教科书问题。显示所有计算并解释逻辑。",
+        "📚 历史分析": "分析这张历史照片/文件：时期、背景、意义、时代的可见细节。",
+        "📚 实验室设置": "描述实验室设置：设备、程序、安全措施。",
+        "🎨 色彩分析": "详细的色彩调色板分析：主色、对比、和谐、色彩情绪、设计应用。",
+        "🏗️ 建筑分析": "建筑分析：风格、时期、结构元素、材料、功能、文化意义。",
+        "🍽️ 菜肴分析": "作为厨师，描述菜肴：配料、烹饪技术、摆盘、风味组合、上菜建议。",
+        "💼 演示幻灯片": "描述演示幻灯片内容：标题、要点、视觉元素、主要信息。",
+        "🏭 工业安全": "分析图像的安全性：识别的风险、违规、建议。",
+        "🎯 分层构图": "分层分析场景：第1层：背景，第2层：中景，第3层：前景，第4层：整体构图和视觉流。",
+        "🎯 空间分析": "描述空间布局：整体布局、前景/中景/背景、对象关系、透视。",
+        "🤔 仔细分析": "在回答之前，首先仔细观察图像。然后，整理关于重要内容的想法。最后，提供涵盖以下内容的结构化响应：主题、上下文、细节和解释。",
+        "🤔 问题发现": "批判性地检查图像。什么效果好？什么可以改进？提供具体建议。",
         "自定义": ""
     }
 }
@@ -2544,8 +2622,17 @@ def create_interface():
 
                         single_prompt_used = gr.Textbox(
                             label="Использованный промпт",
-                            interactive=False,
-                            lines=2
+                            interactive=True,
+                            lines=4,
+                            info="Можно отредактировать и снова сгенерировать",
+                            show_copy_button=True
+                        )
+
+                        # Button to copy prompt back to custom prompt
+                        use_prompt_btn = gr.Button(
+                            "⬆️ Использовать этот промпт",
+                            size="sm",
+                            variant="secondary"
                         )
 
                         # Thinking Process section (collapsible)
@@ -3177,6 +3264,13 @@ def create_interface():
                 model_name, quantization, max_tokens, temperature, top_p, top_k, seed,
                 "video"  # active_media_type
             )
+
+        # Handler for using the prompt from single_prompt_used
+        use_prompt_btn.click(
+            fn=lambda x: x,  # Just pass through the value
+            inputs=[single_prompt_used],
+            outputs=[single_custom_prompt]
+        )
 
         single_submit_btn.click(
             fn=process_single_wrapper,
